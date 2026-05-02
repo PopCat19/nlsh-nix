@@ -22,6 +22,14 @@ Config stored at `~/.config/nlsh/config`:
 | `NLSH_BASE_URL` | API endpoint |
 | `NLSH_MODEL` | Model to use |
 
+**Env vars take precedence over config file.** Set values in your shell to skip prompts or override:
+
+```bash
+export NLSH_API_KEY=sk-...
+export NLSH_BASE_URL=https://api.openai.com/v1
+export NLSH_MODEL=gpt-4.1-mini
+```
+
 ### Examples
 
 **OpenAI:**
