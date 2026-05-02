@@ -37,12 +37,28 @@ def is_natural_language(text: str) -> bool:
         return False
     return not any(text.startswith(s) for s in shell_starters)
 
+def prompt_clarify(question: str, options: dict) -> str:
+    """Show clarification question with options and get user response."""
+    print(f"\033[36m{question}\033[0m")
+    for key, desc in options.items():
+        print(f"  \033[33m{key}\033[0m) {desc}")
+    print()
+    
+    answer = input("\033[33mSelect or type answer: \033[0m").strip().lower()
+    
+    if len(answer) == 1 and answer in options:
+        if answer == 'z' and 'custom' in options.get('z', '').lower():
+            custom = input("\033[33mDescribe: \033[0m").strip()
+            return custom
+        return options[answer]
+    return answer
+
 def run_oneshot(args: str):
     cwd = os.getcwd()
-    result, clarify_q = get_command(args, cwd)
-    if clarify_q:
-        print(f"\033[36mModel asks: {clarify_q}\033[0m")
-        clarification = input("\033[33mAnswer: \033[0m").strip()
+    result, clarify_data = get_command(args, cwd)
+    if clarify_data:
+        question, options = clarify_data
+        clarification = prompt_clarify(question, options)
         result, _ = get_command(args, cwd, clarification)
     command = result
     
@@ -62,10 +78,10 @@ def run_oneshot(args: str):
                 print(result.stderr, end="")
             sys.exit(0)
         elif key == 'r':
-            result, clarify_q = get_command(args, cwd, clarification)
-            if clarify_q:
-                print(f"\033[36mModel asks: {clarify_q}\033[0m")
-                answer = input("\033[33mAnswer: \033[0m").strip()
+            result, clarify_data = get_command(args, cwd, clarification)
+            if clarify_data:
+                question, options = clarify_data
+                answer = prompt_clarify(question, options)
                 if answer:
                     clarification = f"{clarification} {answer}".strip() if clarification else answer
                 result, _ = get_command(args, cwd, clarification)
@@ -139,10 +155,10 @@ def run_repl():
                 continue
 
             try:
-                result, clarify_q = get_command(user_input, cwd)
-                if clarify_q:
-                    print(f"\033[36mModel asks: {clarify_q}\033[0m")
-                    clarification = input("\033[33mAnswer: \033[0m").strip()
+                result, clarify_data = get_command(user_input, cwd)
+                if clarify_data:
+                    question, options = clarify_data
+                    clarification = prompt_clarify(question, options)
                     result, _ = get_command(user_input, cwd, clarification)
                 command = result
             except TimeoutError:
@@ -177,10 +193,10 @@ def run_repl():
                     break
                 elif key == 'r':
                     try:
-                        result, clarify_q = get_command(user_input, cwd, clarification)
-                        if clarify_q:
-                            print(f"\033[36mModel asks: {clarify_q}\033[0m")
-                            answer = input("\033[33mAnswer: \033[0m").strip()
+                        result, clarify_data = get_command(user_input, cwd, clarification)
+                        if clarify_data:
+                            question, options = clarify_data
+                            answer = prompt_clarify(question, options)
                             if answer:
                                 clarification = f"{clarification} {answer}".strip() if clarification else answer
                             result, _ = get_command(user_input, cwd, clarification)

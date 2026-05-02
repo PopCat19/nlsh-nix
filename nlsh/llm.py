@@ -63,6 +63,21 @@ def ensure_shell_context():
         _shell_context = get_shell_context()
     return _shell_context
 
+def parse_clarify_response(text: str) -> tuple:
+    """Parse CLARIFY response into question and options."""
+    lines = text.strip().split('\n')
+    question = lines[0].strip() if lines else ""
+    options = {}
+    
+    for line in lines[1:]:
+        line = line.strip()
+        if line and len(line) > 2 and line[1] == ')':
+            key = line[0].lower()
+            if key.isalpha():
+                options[key] = line[3:].strip()
+    
+    return (question, options)
+
 def get_command(user_input: str, cwd: str, clarification: str = "") -> tuple:
     history_context = format_history()
     shell_context = ensure_shell_context()
@@ -80,7 +95,7 @@ Recent command history:
 Rules:
 - Output ONLY the command, nothing else
 - No explanations, no markdown, no backticks
-- If the request is ambiguous or vague, respond with: CLARIFY: <your question>
+- If the request is ambiguous or vague, respond with: CLARIFY: <question>\n  a) <option a>\n  b) <option b>\n  ...\n  z) custom (describe what you want)
 - Otherwise, make a reasonable assumption
 - Prefer simple, common commands
 - Prefer using available aliases/abbreviations when they match
@@ -101,8 +116,10 @@ User request: {user_input}"""
         # Check if model is asking for clarification (may be after command)
         if "\nCLARIFY:" in result or result.startswith("CLARIFY:"):
             clarify_idx = result.find("CLARIFY:")
-            clarify_q = result[clarify_idx + 8:].strip()
-            return (None, clarify_q)
+            clarify_text = result[clarify_idx + 8:].strip()
+            question, options = parse_clarify_response(clarify_text)
+            return (None, (question, options))
+        return (result, None)
         return (result, None)
     except Exception as e:
         if "timeout" in str(e).lower() or "timed out" in str(e).lower():
