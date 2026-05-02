@@ -10,6 +10,7 @@
 import os
 import time
 import subprocess
+import threading
 
 from .ui import get_single_key, AwaitIndicator
 import subprocess
@@ -141,16 +142,30 @@ Output only the scout commands, nothing else:"""
             print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
             continue
         elif key == '\r' or key == '\n':  # Run
+            print(f"  \033[36m[running] (0s/10s)\033[0m", end='\r')
             start = time.time()
+            
+            def show_time():
+                while True:
+                    elapsed = int(time.time() - start)
+                    print(f"  \033[36m[running] ({elapsed}s/10s)\033[0m", end='\r')
+                    time.sleep(1)
+            
+            timer = threading.Thread(target=show_time, daemon=True)
+            timer.start()
+            
             try:
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
                 elapsed = int(time.time() - start)
                 print(f"  {i}. $ {cmd} \033[32m({elapsed}s/10s)\033[0m")
-                output = (result.stdout + result.stderr)[:500]
+                output = (result.stdout + result.stderr)
                 if output.strip():
-                    for line in output.strip().split('\n')[:10]:
+                    print(f"  \033[36m[output]\033[0m")
+                    # Show max 20 lines
+                    for line in output.strip().split('\n')[:20]:
                         print(f"     {line}")
-                scout_results.append(f"$ {cmd}\n{output}")
+                # Keep full output for LLM
+                scout_results.append(f"$ {cmd}\n{output[:500]}")
             except subprocess.TimeoutExpired:
                 print(f"  {i}. $ {cmd} \033[31m[timeout]\033[0m")
         else:
