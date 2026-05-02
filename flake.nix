@@ -32,8 +32,9 @@
 
             installPhase = ''
               runHook preInstall
-              mkdir -p $out/${python.sitePackages}/nlsh
+              mkdir -p $out/${python.sitePackages}/nlsh/llm
               cp nlsh/*.py $out/${python.sitePackages}/nlsh/
+              cp nlsh/llm/*.py $out/${python.sitePackages}/nlsh/llm/
               runHook postInstall
             '';
           };
