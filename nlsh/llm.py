@@ -109,6 +109,7 @@ Output only the scout commands, nothing else:"""
             )
         scout_cmds = response.choices[0].message.content.strip().split('\n')
         scout_cmds = [c.strip() for c in scout_cmds if c.strip() and 'sudo' not in c]
+        scout_cmds = [c for c in scout_cmds if not c.startswith('```') and not c == '']
         scout_cmds = scout_cmds[:5]  # Max 5
     except:
         scout_cmds = ['ls -la', 'pwd']
