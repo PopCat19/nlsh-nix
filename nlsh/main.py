@@ -10,6 +10,8 @@ import signal
 import os
 import sys
 import subprocess
+import threading
+import time
 
 from .config import load_config, is_configured, setup_api_key, config_menu, is_loaded_from_config
 from .llm import init_client, reinit_client, get_command, get_commands
@@ -18,9 +20,23 @@ from .ui import get_single_key, show_help, show_config, raw_input
 
 SHELL = os.environ.get('SHELL', '/bin/sh')
 
-def run_cmd(cmd: str) -> subprocess.CompletedProcess:
-    """Run command through user's shell."""
-    return subprocess.run([SHELL, '-c', cmd], capture_output=True, text=True)
+def run_cmd(cmd: str) -> int:
+    """Run command through user's shell, show running indicator."""
+    print(f"\033[36m[running] (0s)\033[0m", end="\r")
+    start = time.time()
+    
+    def show_time():
+        while True:
+            elapsed = int(time.time() - start)
+            print(f"\033[36m[running] ({elapsed}s)\033[0m", end="\r")
+            time.sleep(1)
+    
+    timer = threading.Thread(target=show_time, daemon=True)
+    timer.start()
+    
+    result = os.system(cmd)
+    print(" " * 30, end="\r")  # Clear running indicator
+    return result
 
 def exit_handler(sig, frame):
     print()
@@ -76,6 +92,18 @@ def show_ask_options():
     print("  \033[33mEsc\033[0m) Cancel")
     print()
 
+def confirm_run(cmd: str) -> bool:
+    """Ask for confirmation before running, warn if sudo."""
+    if 'sudo' in cmd:
+        print(f"\033[31m⚠ sudo detected: {cmd}\033[0m")
+        print("\033[36m[Enter=confirm Esc=cancel]\033[0m")
+    else:
+        print(f"\033[33m→ {cmd}\033[0m")
+        print("\033[36m[Enter=confirm Esc=cancel]\033[0m")
+    
+    key = get_single_key()
+    return key == '\r' or key == '\n'
+
 def show_gen_options(commands: list):
     print("\033[36mGenerated commands:\033[0m")
     for i, cmd in enumerate(commands, 1):
@@ -107,33 +135,17 @@ def run_oneshot(args: str):
         print(f"\033[36m[Enter=1 2-3=select r=regen a=ask Esc=cancel]{regen_str}\033[0m")
         key = get_single_key()
         
-        if key == '\r' or key == '\n':
-            command = commands[0]
-            result = run_cmd(command)
-            print(result.stdout, end="")
-            if result.stderr:
-                print(result.stderr, end="")
-            sys.exit(0)
-        elif key == '1':
-            command = commands[0]
-            result = run_cmd(command)
-            print(result.stdout, end="")
-            if result.stderr:
-                print(result.stderr, end="")
+        if key == '\r' or key == '\n' or key == '1':
+            if confirm_run(commands[0]):
+                run_cmd(commands[0])
             sys.exit(0)
         elif key == '2':
-            command = commands[1]
-            result = run_cmd(command)
-            print(result.stdout, end="")
-            if result.stderr:
-                print(result.stderr, end="")
+            if confirm_run(commands[1]):
+                run_cmd(commands[1])
             sys.exit(0)
         elif key == '3':
-            command = commands[2]
-            result = run_cmd(command)
-            print(result.stdout, end="")
-            if result.stderr:
-                print(result.stderr, end="")
+            if confirm_run(commands[2]):
+                run_cmd(commands[2])
             sys.exit(0)
         elif key == 'r':
             try:
@@ -238,19 +250,15 @@ def run_repl():
                 cmd = user_input[1:]
                 if not cmd:
                     continue
-                result = run_cmd(cmd)
-                print(result.stdout, end="")
-                if result.stderr:
-                    print(result.stderr, end="")
-                add_to_history(cmd, result.stdout + result.stderr)
+                if confirm_run(cmd):
+                    run_cmd(cmd)
+                    add_to_history(cmd, "")
                 continue
 
             if not is_natural_language(user_input):
-                result = run_cmd(user_input)
-                print(result.stdout, end="")
-                if result.stderr:
-                    print(result.stderr, end="")
-                add_to_history(user_input, result.stdout + result.stderr)
+                if confirm_run(user_input):
+                    run_cmd(user_input)
+                    add_to_history(user_input, "")
                 continue
 
             try:
@@ -272,7 +280,10 @@ def run_repl():
             regen_count = 0
             clarification = ""
             while True:
-                print(f"\033[33m→ {command}\033[0m")
+                if 'sudo' in command:
+                    print(f"\033[31m⚠ sudo: {command}\033[0m")
+                else:
+                    print(f"\033[33m→ {command}\033[0m")
                 regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
                 print(f"\033[36m[Enter=run r=regen a=ask Esc=cancel]{regen_str}\033[0m")
                 key = get_single_key()
@@ -285,11 +296,8 @@ def run_repl():
                         except Exception as e:
                             print(f"cd: {e}")
                     else:
-                        result = run_cmd(command)
-                        print(result.stdout, end="")
-                        if result.stderr:
-                            print(result.stderr, end="")
-                        add_to_history(command, result.stdout + result.stderr)
+                        run_cmd(command)
+                        add_to_history(command, "")
                     print()
                     break
                 elif key == 'r':
