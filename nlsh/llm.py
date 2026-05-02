@@ -78,6 +78,74 @@ def parse_clarify_response(text: str) -> tuple:
     
     return (question, options)
 
+def get_commands(user_input: str, cwd: str, clarification: str = "") -> list:
+    """Generate 3 command options for the user request."""
+    history_context = format_history()
+    shell_context = ensure_shell_context()
+    regen_context = format_regen_history()
+    
+    clarification_section = f"\n\nClarification: {clarification}" if clarification else ""
+    regen_section = f"\n\nPrevious attempts:\n{regen_context}" if regen_context != "No previous attempts." else ""
+    
+    prompt = f"""You are a shell command translator. Generate exactly 3 different command options for the user's request.
+
+{shell_context}
+Current directory: {cwd}
+
+Recent command history:
+{history_context}{regen_section}{clarification_section}
+
+Rules:
+- Output exactly 3 commands, one per line, numbered 1-3
+- Each command should be a different approach
+- No explanations, no markdown, no backticks
+- First line: 1) <command>
+- Second line: 2) <command>
+- Third line: 3) <command>
+- Learn from previous attempts
+- Prefer simple, common commands
+- Prefer using available aliases/abbreviations when they match
+
+User request: {user_input}"""
+
+    try:
+        with AwaitIndicator():
+            response = _client.chat.completions.create(
+                model=os.environ["NLSH_MODEL"],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=256,
+                timeout=TIMEOUT,
+            )
+        result = response.choices[0].message.content.strip()
+        
+        # Parse numbered commands
+        commands = []
+        for line in result.split('\n'):
+            line = line.strip()
+            if line and len(line) > 2:
+                # Handle "1) cmd" or "1. cmd" format
+                if line[0].isdigit() and line[1] in ') .':
+                    cmd = line[2:].strip()
+                    if cmd:
+                        commands.append(cmd)
+                elif line[0].isdigit() and not commands:
+                    # Just a number, skip
+                    pass
+        
+        if len(commands) >= 3:
+            return commands[:3]
+        
+        # Fallback: if we didn't get 3 commands, generate single and replicate
+        single = get_command(user_input, cwd, clarification)
+        if single and single[0]:
+            return [single[0], single[0], single[0]]
+        return ["echo 'no command generated'"] * 3
+        
+    except TimeoutError:
+        raise
+    except Exception as e:
+        raise
+
 def get_command(user_input: str, cwd: str, clarification: str = "") -> tuple:
     history_context = format_history()
     shell_context = ensure_shell_context()

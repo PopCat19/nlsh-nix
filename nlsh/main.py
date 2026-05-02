@@ -12,7 +12,7 @@ import sys
 import subprocess
 
 from .config import load_config, is_configured, setup_api_key, config_menu, is_loaded_from_config
-from .llm import init_client, reinit_client, get_command
+from .llm import init_client, reinit_client, get_command, get_commands
 from .history import add_to_history, reset_regen_history, add_regen
 from .ui import get_single_key, show_help, show_config, raw_input
 
@@ -76,23 +76,18 @@ def show_ask_options():
     print("  \033[33mEsc\033[0m) Cancel")
     print()
 
+def show_gen_options(commands: list):
+    print("\033[36mGenerated commands:\033[0m")
+    for i, cmd in enumerate(commands, 1):
+        print(f"  \033[33m{i}\033[0m) {cmd}")
+    print("  \033[33mEnter\033[0m = 1\n")
+
 def run_oneshot(args: str):
     cwd = os.getcwd()
     reset_regen_history()
     
     try:
-        result, clarify_data = get_command(args, cwd)
-        if clarify_data:
-            question, options = clarify_data
-            clarification = prompt_clarify(question, options)
-            if not clarification:
-                print("\033[31mNo clarification provided\033[0m")
-                sys.exit(1)
-            result, _ = get_command(args, cwd, clarification)
-        if not result:
-            print("\033[31mNo command generated\033[0m")
-            sys.exit(1)
-        command = result
+        commands = get_commands(args, cwd)
     except TimeoutError:
         print("\033[31mtimed out\033[0m")
         sys.exit(1)
@@ -100,18 +95,41 @@ def run_oneshot(args: str):
         print(f"\033[31merror: {e}\033[0m")
         sys.exit(1)
     
+    command = commands[0]  # Default to first
     add_regen(command)
     
     regen_count = 0
     clarification = ""
     
     while True:
-        print(f"\033[33m→ {command}\033[0m")
+        show_gen_options(commands)
         regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-        print(f"\033[36m[Enter=run r=regen a=ask Esc=cancel]{regen_str}\033[0m")
+        print(f"\033[36m[Enter=1 2-3=select r=regen a=ask Esc=cancel]{regen_str}\033[0m")
         key = get_single_key()
         
         if key == '\r' or key == '\n':
+            command = commands[0]
+            result = run_cmd(command)
+            print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
+            sys.exit(0)
+        elif key == '1':
+            command = commands[0]
+            result = run_cmd(command)
+            print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
+            sys.exit(0)
+        elif key == '2':
+            command = commands[1]
+            result = run_cmd(command)
+            print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
+            sys.exit(0)
+        elif key == '3':
+            command = commands[2]
             result = run_cmd(command)
             print(result.stdout, end="")
             if result.stderr:
@@ -119,19 +137,10 @@ def run_oneshot(args: str):
             sys.exit(0)
         elif key == 'r':
             try:
-                result, clarify_data = get_command(args, cwd, clarification)
-                if clarify_data:
-                    question, options = clarify_data
-                    answer = prompt_clarify(question, options)
-                    if answer:
-                        clarification = f"{clarification} {answer}".strip() if clarification else answer
-                    result, _ = get_command(args, cwd, clarification)
-                if result:
-                    command = result
-                    add_regen(command, clarification)
-                    regen_count += 1
-                else:
-                    print("\033[31mNo command generated\033[0m")
+                commands = get_commands(args, cwd, clarification)
+                command = commands[0]
+                add_regen(command, clarification)
+                regen_count += 1
             except TimeoutError:
                 print("\033[31mtimed out\033[0m")
             except Exception as e:
@@ -174,13 +183,10 @@ def run_oneshot(args: str):
             else:
                 continue
             try:
-                result, _ = get_command(args, cwd, clarification)
-                if result:
-                    command = result
-                    add_regen(command, clarification)
-                    regen_count += 1
-                else:
-                    print("\033[31mNo command generated\033[0m")
+                commands = get_commands(args, cwd, clarification)
+                command = commands[0]
+                add_regen(command, clarification)
+                regen_count += 1
             except TimeoutError:
                 print("\033[31mtimed out\033[0m")
             except Exception as e:
