@@ -53,13 +53,14 @@ def prompt_clarify(question: str, options: dict) -> str:
         return options[answer]
     return answer
 
-def show_request_options():
-    print("\033[36mWhat would you like?\033[0m")
-    print("  \033[33m1\033[0m) A different command for the same request")
-    print("  \033[33m2\033[0m) Modify this command (describe changes)")
-    print("  \033[33m3\033[0m) A safer/alternative approach")
-    print("  \033[33m4\033[0m) Something completely different")
-    print("  \033[33m0\033[0m) Custom request")
+def show_ask_options():
+    print("\033[36mWhat do you want?\033[0m")
+    print("  \033[33m1\033[0m) Clarify the request")
+    print("  \033[33m2\033[0m) A different command")
+    print("  \033[33m3\033[0m) Modify this command")
+    print("  \033[33m4\033[0m) Safer/alternative approach")
+    print("  \033[33m5\033[0m) Something completely different")
+    print("  \033[33m0\033[0m) Custom description")
     print()
 
 def run_oneshot(args: str):
@@ -79,7 +80,7 @@ def run_oneshot(args: str):
     while True:
         print(f"\033[33m→ {command}\033[0m")
         regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-        print(f"\033[36m[Enter=run r=regen c=clarify t=tell Esc=cancel]{regen_str}\033[0m")
+        print(f"\033[36m[Enter=run r=regen a=ask Esc=cancel]{regen_str}\033[0m")
         key = get_single_key()
         
         if key == '\r' or key == '\n':
@@ -99,26 +100,23 @@ def run_oneshot(args: str):
             command = result
             add_regen(command, clarification)
             regen_count += 1
-        elif key == 'c':
-            clarification = input("\033[33mClarify: \033[0m").strip()
-            result, _ = get_command(args, cwd, clarification)
-            command = result
-            add_regen(command, clarification)
-            regen_count += 1
-        elif key == 't':
-            show_request_options()
+        elif key == 'a':
+            show_ask_options()
             choice = input("\033[33mSelect: \033[0m").strip()
             if choice == '0':
                 custom = input("\033[33mDescribe: \033[0m").strip()
                 clarification = f"{clarification} {custom}".strip() if clarification else custom
             elif choice == '1':
-                clarification = f"{clarification} generate a completely different command".strip()
+                clarify = input("\033[33mClarify: \033[0m").strip()
+                clarification = f"{clarification} clarify: {clarify}".strip()
             elif choice == '2':
+                clarification = f"{clarification} generate a different command".strip()
+            elif choice == '3':
                 changes = input("\033[33mDescribe changes: \033[0m").strip()
                 clarification = f"{clarification} modify: {changes}".strip()
-            elif choice == '3':
-                clarification = f"{clarification} generate a safer alternative".strip()
             elif choice == '4':
+                clarification = f"{clarification} generate a safer alternative".strip()
+            elif choice == '5':
                 new_req = input("\033[33mNew request: \033[0m").strip()
                 args = new_req
                 reset_regen_history()
@@ -209,7 +207,7 @@ def run_repl():
             while True:
                 print(f"\033[33m→ {command}\033[0m")
                 regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-                print(f"\033[36m[Enter=run r=regen c=clarify t=tell Esc=cancel]{regen_str}\033[0m")
+                print(f"\033[36m[Enter=run r=regen a=ask Esc=cancel]{regen_str}\033[0m")
                 key = get_single_key()
                 
                 if key == '\r' or key == '\n':
@@ -243,31 +241,23 @@ def run_repl():
                         print("\033[31mtimed out - press r to retry\033[0m")
                     except Exception as e:
                         print(f"\033[31merror: {e}\033[0m")
-                elif key == 'c':
-                    clarification = input("\033[33mClarify: \033[0m").strip()
-                    try:
-                        result, _ = get_command(user_input, cwd, clarification)
-                        command = result
-                        add_regen(command, clarification)
-                        regen_count += 1
-                    except TimeoutError:
-                        print("\033[31mtimed out\033[0m")
-                    except Exception as e:
-                        print(f"\033[31merror: {e}\033[0m")
-                elif key == 't':
-                    show_request_options()
+                elif key == 'a':
+                    show_ask_options()
                     choice = input("\033[33mSelect: \033[0m").strip()
                     if choice == '0':
                         custom = input("\033[33mDescribe: \033[0m").strip()
                         clarification = f"{clarification} {custom}".strip() if clarification else custom
                     elif choice == '1':
-                        clarification = f"{clarification} generate a completely different command".strip()
+                        clarify = input("\033[33mClarify: \033[0m").strip()
+                        clarification = f"{clarification} clarify: {clarify}".strip()
                     elif choice == '2':
+                        clarification = f"{clarification} generate a different command".strip()
+                    elif choice == '3':
                         changes = input("\033[33mDescribe changes: \033[0m").strip()
                         clarification = f"{clarification} modify: {changes}".strip()
-                    elif choice == '3':
-                        clarification = f"{clarification} generate a safer alternative".strip()
                     elif choice == '4':
+                        clarification = f"{clarification} generate a safer alternative".strip()
+                    elif choice == '5':
                         new_req = input("\033[33mNew request: \033[0m").strip()
                         user_input = new_req
                         reset_regen_history()
