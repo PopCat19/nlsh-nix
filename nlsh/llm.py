@@ -333,12 +333,12 @@ def scout_and_get_commands(user_input, cwd, store):
             continue
 
         print(f"  {i}. $ {cmd}")
-        print("  [Enter=run s=skip r=regen Esc=cancel]", end="", flush=True)
+        print("  \033[36m[Enter=run s=skip r=regen Esc=cancel]\033[0m", end="", flush=True)
         key = get_single_key()
         print()
 
         if key == "\x1b":
-            print("\033[33mScout cancelled\033[0m")
+            print("\033[31mScout cancelled\033[0m")
             break
         elif key in ("s", "S"):
             print("  \033[90m[skipped]\033[0m")

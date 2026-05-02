@@ -140,7 +140,7 @@ def config_menu(config):
             config.base_url = original.base_url
             config.model = original.model
             config.api_key = original.api_key
-            print("\033[33m✗ Cancelled\033[0m\n")
+            print("\033[31m✗ Cancelled\033[0m\n")
             break
         else:
             print("\033[31mInvalid option\033[0m")

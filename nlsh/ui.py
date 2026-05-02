@@ -174,9 +174,9 @@ def show_gen_options(commands):
     for i, cmd in enumerate(commands, 1):
         if cmd.desc:
             print(f"  \033[33m{i}\033[0m) \033[35m{cmd.desc}\033[0m")
-            print(f"  ↳ {cmd.cmd}")
+            print(f"  ↳ \033[33m{cmd.cmd}\033[0m")
         else:
-            print(f"  \033[33m{i}\033[0m) {cmd.cmd}")
+            print(f"  \033[33m{i}\033[0m) \033[33m{cmd.cmd}\033[0m")
     print()
 
 
