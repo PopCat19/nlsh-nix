@@ -78,6 +78,105 @@ def parse_clarify_response(text: str) -> tuple:
     
     return (question, options)
 
+def scout_and_get_commands(user_input: str, cwd: str) -> list:
+    """Let model scout the environment first, then generate commands."""
+    history_context = format_history()
+    shell_context = ensure_shell_context()
+    
+    # Step 1: Ask model what to scout
+    scout_prompt = f"""You are scouting a shell environment. What commands should you run to understand the context for this request?
+
+{shell_context}
+Current directory: {cwd}
+
+Rules:
+- Output ONLY the commands to run, one per line
+- NO sudo allowed - skip if needed
+- Keep it minimal (2-5 commands max)
+- Common scouts: ls, cat, which, find, grep
+
+Request: {user_input}
+
+Output only the scout commands, nothing else:"""
+    
+    try:
+        with AwaitIndicator():
+            response = _client.chat.completions.create(
+                model=os.environ["NLSH_MODEL"],
+                messages=[{"role": "user", "content": scout_prompt}],
+                max_tokens=256,
+                timeout=TIMEOUT,
+            )
+        scout_cmds = response.choices[0].message.content.strip().split('\n')
+        scout_cmds = [c.strip() for c in scout_cmds if c.strip() and 'sudo' not in c]
+        scout_cmds = scout_cmds[:5]  # Max 5
+    except:
+        scout_cmds = ['ls -la', 'pwd']
+    
+    # Step 2: Run scout commands
+    print(f"\033[36mScouting...\033[0m")
+    scout_results = []
+    for cmd in scout_cmds:
+        print(f"  \033[33m$ {cmd}\033[0m")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+        output = (result.stdout + result.stderr)[:500]  # Truncate
+        scout_results.append(f"$ {cmd}\n{output}")
+    
+    # Step 3: Generate commands with scout context
+    scout_context = "\n\n".join(scout_results)
+    
+    prompt = f"""You are a shell command translator. Generate exactly 3 different command options for the user's request.
+
+{shell_context}
+Current directory: {cwd}
+
+Scout results:
+{scout_context}
+
+Rules:
+- Output exactly 3 commands, one per line, numbered 1-3
+- Each command should be a different approach
+- No explanations, no markdown, no backticks
+- First line: 1) <command>
+- Second line: 2) <command>
+- Third line: 3) <command>
+- Prefer simple, common commands
+
+User request: {user_input}"""
+
+    try:
+        with AwaitIndicator():
+            response = _client.chat.completions.create(
+                model=os.environ["NLSH_MODEL"],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=256,
+                timeout=TIMEOUT,
+            )
+        result = response.choices[0].message.content.strip()
+        
+        commands = []
+        for line in result.split('\n'):
+            line = line.strip()
+            if line and len(line) > 2:
+                if line[0].isdigit() and line[1] in ') .':
+                    cmd = line[2:].strip()
+                    if cmd:
+                        commands.append(cmd)
+        
+        if len(commands) >= 3:
+            return commands[:3]
+        
+        # Fallback
+        single = get_command(user_input, cwd, "")
+        if single and single[0]:
+            return [single[0], single[0], single[0]]
+        return ["echo 'no command generated'"] * 3
+        
+    except TimeoutError:
+        raise
+    except Exception as e:
+        raise
+
 def get_commands(user_input: str, cwd: str, clarification: str = "") -> list:
     """Generate 3 command options for the user request."""
     history_context = format_history()

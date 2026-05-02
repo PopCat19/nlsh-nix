@@ -14,7 +14,7 @@ import threading
 import time
 
 from .config import load_config, is_configured, setup_api_key, config_menu, is_loaded_from_config
-from .llm import init_client, reinit_client, get_command, get_commands
+from .llm import init_client, reinit_client, get_command, get_commands, scout_and_get_commands
 from .history import add_to_history, reset_regen_history, add_regen
 from .ui import get_single_key, show_help, show_config, raw_input
 
@@ -123,7 +123,8 @@ def show_gen_options(commands: list):
     print("\033[36mGenerated commands:\033[0m")
     for i, cmd in enumerate(commands, 1):
         print(f"  \033[33m{i}\033[0m) {cmd}")
-    print("  \033[33mEnter\033[0m = 1\n")
+    print("  \033[33mEnter\033[0m = 1  \033[33ms\033[0m = scout first")
+    print()
 
 def run_oneshot(args: str):
     cwd = os.getcwd()
@@ -162,6 +163,17 @@ def run_oneshot(args: str):
             if confirm_run(commands[2]):
                 run_cmd(commands[2])
             sys.exit(0)
+        elif key == 's':
+            try:
+                print()
+                commands = scout_and_get_commands(args, cwd)
+                command = commands[0]
+                clarification = ""
+                regen_count = 0
+            except TimeoutError:
+                print("\033[31mtimed out\033[0m")
+            except Exception as e:
+                print(f"\033[31merror: {e}\033[0m")
         elif key == 'r':
             try:
                 commands = get_commands(args, cwd, clarification)
