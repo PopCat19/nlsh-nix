@@ -303,23 +303,24 @@ def main():
     if args:
         cwd = os.getcwd()
         command = get_command(args, cwd)
-        print(f"\033[33m→ {command}\033[0m")
-        print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
-        key = get_single_key()
-        if key == '\r' or key == '\n':  # Enter
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
-            print(result.stdout, end="")
-            if result.stderr:
-                print(result.stderr, end="")
-        elif key == 'r':
-            command = get_command(args, cwd)
+        
+        while True:
             print(f"\033[33m→ {command}\033[0m")
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
-            print(result.stdout, end="")
-            if result.stderr:
-                print(result.stderr, end="")
-        # ESC or anything else: cancel (exit silently)
-        sys.exit(0)
+            print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
+            key = get_single_key()
+            
+            if key == '\r' or key == '\n':  # Enter
+                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                print(result.stdout, end="")
+                if result.stderr:
+                    print(result.stderr, end="")
+                sys.exit(0)
+            elif key == 'r':
+                command = get_command(args, cwd)
+            elif key == '\x1b':  # ESC
+                sys.exit(0)
+            else:
+                sys.exit(0)
 
     while True:
         try:
