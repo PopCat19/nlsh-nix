@@ -47,6 +47,22 @@ Clarify: use home-manager
 [Enter=run r=regen c=clarify Esc=cancel] (regen 1)
 ```
 
+### Model-initiated clarification
+
+If your request is vague, the model may ask for clarification first:
+
+```
+popcat19 > delete the file
+[awaiting API response...] (1s/30s)
+Model asks: Which file do you want to delete?
+Answer: config.json
+[awaiting API response...] (1s/30s)
+→ rm config.json
+[Enter=run r=regen c=clarify Esc=cancel]
+```
+
+Clarifications persist across regenerations. Press `c` with empty input to clear.
+
 ### Commands
 
 | Command | Description |
