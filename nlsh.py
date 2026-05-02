@@ -286,8 +286,11 @@ def format_history() -> str:
                 lines.append(f"   {line}")
     return "\n".join(lines)
 
-def get_command(user_input: str, cwd: str) -> str:
+def get_command(user_input: str, cwd: str, clarification: str = "") -> str:
     history_context = format_history()
+    
+    clarification_section = f"\n\nClarification: {clarification}" if clarification else ""
+    
     prompt = f"""You are a shell command translator. Convert the user's request into a shell command.
 
 {_shell_context}
@@ -302,7 +305,7 @@ Rules:
 - If unclear, make a reasonable assumption
 - Prefer simple, common commands
 - Prefer using available aliases/abbreviations when they match
-- Use the command history for context (e.g., "do that again", "delete the file I just created")
+- Use the command history for context (e.g., "do that again", "delete the file I just created"){clarification_section}
 
 User request: {user_input}"""
 
@@ -346,7 +349,7 @@ def main():
         while True:
             print(f"\033[33m→ {command}\033[0m")
             regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-            print(f"\033[36m[Enter=run r=regen Esc=cancel]{regen_str}\033[0m")
+            print(f"\033[36m[Enter=run r=regen c=clarify Esc=cancel]{regen_str}\033[0m")
             key = get_single_key()
             
             if key == '\r' or key == '\n':  # Enter
@@ -358,6 +361,12 @@ def main():
             elif key == 'r':
                 command = get_command(args, cwd)
                 regen_count += 1
+            elif key == 'c':
+                # Restore terminal for input
+                clarification = input("\033[33mClarify: \033[0m").strip()
+                if clarification:
+                    command = get_command(args, cwd, clarification)
+                    regen_count += 1
             elif key == '\x1b':  # ESC
                 sys.exit(0)
             else:
@@ -436,7 +445,7 @@ def main():
             while True:
                 print(f"\033[33m→ {command}\033[0m")
                 regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-                print(f"\033[36m[Enter=run r=regen Esc=cancel]{regen_str}\033[0m")
+                print(f"\033[36m[Enter=run r=regen c=clarify Esc=cancel]{regen_str}\033[0m")
                 key = get_single_key()
                 
                 if key == '\r' or key == '\n':  # Enter
@@ -462,6 +471,16 @@ def main():
                         print("\033[31mtimed out - press r to retry\033[0m")
                     except Exception as e:
                         print(f"\033[31merror: {e}\033[0m")
+                elif key == 'c':
+                    clarification = input("\033[33mClarify: \033[0m").strip()
+                    if clarification:
+                        try:
+                            command = get_command(user_input, cwd, clarification)
+                            regen_count += 1
+                        except TimeoutError:
+                            print("\033[31mtimed out\033[0m")
+                        except Exception as e:
+                            print(f"\033[31merror: {e}\033[0m")
                 elif key == '\x1b':  # ESC
                     print()  # Newline for clean exit
                     break
