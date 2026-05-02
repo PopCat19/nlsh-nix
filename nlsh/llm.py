@@ -126,7 +126,10 @@ Output only the scout commands, nothing else:"""
     
     for i, cmd in enumerate(scout_cmds, 1):
         # Block slow/dangerous patterns
-        if any(x in cmd for x in ['find /', 'rm', 'dd', 'mkfs', 'sudo', '>']):
+        blocked = False
+        if cmd.strip().startswith('find / ') or ' rm ' in cmd or cmd.startswith('rm ') or ' dd ' in cmd or 'mkfs' in cmd or 'sudo' in cmd or ' > ' in cmd:
+            blocked = True
+        if blocked:
             print(f"  {i}. $ {cmd} \033[31m[blocked]\033[0m")
             continue
         
