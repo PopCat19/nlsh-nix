@@ -225,6 +225,38 @@ command_history = []
 MAX_HISTORY = 10
 MAX_CONTEXT_CHARS = 4000
 
+def get_shell_context() -> str:
+    """Get shell-specific context (aliases, functions, abbr)."""
+    shell = os.environ.get('SHELL', '/bin/bash')
+    lines = [f"Shell: {shell}"]
+    
+    if 'fish' in shell:
+        # Get fish abbreviations
+        try:
+            result = subprocess.run(['fish', '-c', 'abbr --show'], capture_output=True, text=True, timeout=2)
+            if result.returncode == 0 and result.stdout.strip():
+                abbrs = [l for l in result.stdout.strip().split('\n')[:10] if l]
+                if abbrs:
+                    lines.append("Fish abbreviations:")
+                    lines.extend(abbrs[:10])
+        except:
+            pass
+    else:
+        # Get aliases for bash/zsh
+        try:
+            result = subprocess.run([shell, '-ic', 'alias'], capture_output=True, text=True, timeout=2)
+            if result.returncode == 0 and result.stdout.strip():
+                aliases = [l for l in result.stdout.strip().split('\n')[:10] if l and not l.startswith('#')]
+                if aliases:
+                    lines.append("Aliases:")
+                    lines.extend(aliases[:10])
+        except:
+            pass
+    
+    return '\n'.join(lines)
+
+_shell_context = get_shell_context()
+
 def get_context_size() -> int:
     return sum(len(e["command"]) + len(e["output"]) for e in command_history)
 
@@ -253,7 +285,9 @@ def format_history() -> str:
 
 def get_command(user_input: str, cwd: str) -> str:
     history_context = format_history()
-    prompt = f"""You are a shell command translator. Convert the user's request into a shell command for Linux/bash.
+    prompt = f"""You are a shell command translator. Convert the user's request into a shell command.
+
+{_shell_context}
 Current directory: {cwd}
 
 Recent command history:
@@ -264,6 +298,7 @@ Rules:
 - No explanations, no markdown, no backticks
 - If unclear, make a reasonable assumption
 - Prefer simple, common commands
+- Prefer using available aliases/abbreviations when they match
 - Use the command history for context (e.g., "do that again", "delete the file I just created")
 
 User request: {user_input}"""
