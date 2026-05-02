@@ -10,126 +10,60 @@
 import os
 import time
 import subprocess
-import threading
 
 from openai import OpenAI
 
 from .ui import get_single_key, AwaitIndicator, TIMEOUT
-from .history import format_history, format_regen_history
+from .types import Command, ClarifyData
 
 _client = None
 _shell_context = None
 
-def init_client():
-    global _client
-    _client = OpenAI(
-        api_key=os.environ.get("NLSH_API_KEY", ""),
-        base_url=os.environ["NLSH_BASE_URL"],
-    )
+# --- Prompts ---
 
-def reinit_client():
-    global _client
-    _client = OpenAI(
-        api_key=os.environ.get("NLSH_API_KEY", ""),
-        base_url=os.environ["NLSH_BASE_URL"],
-    )
-
-def get_shell_context() -> str:
-    shell = os.environ.get('SHELL', '/bin/bash')
-    lines = [f"Shell: {shell}"]
-    
-    if 'fish' in shell:
-        try:
-            result = subprocess.run(['fish', '-c', 'abbr --show'], capture_output=True, text=True, timeout=2)
-            if result.returncode == 0 and result.stdout.strip():
-                abbrs = [l for l in result.stdout.strip().split('\n')[:10] if l]
-                if abbrs:
-                    lines.append("Fish abbreviations:")
-                    lines.extend(abbrs[:10])
-        except:
-            pass
-    else:
-        try:
-            result = subprocess.run([shell, '-ic', 'alias'], capture_output=True, text=True, timeout=2)
-            if result.returncode == 0 and result.stdout.strip():
-                aliases = [l for l in result.stdout.strip().split('\n')[:10] if l and not l.startswith('#')]
-                if aliases:
-                    lines.append("Aliases:")
-                    lines.extend(aliases[:10])
-        except:
-            pass
-    
-    return '\n'.join(lines)
-
-def ensure_shell_context():
-    global _shell_context
-    if _shell_context is None:
-        _shell_context = get_shell_context()
-    return _shell_context
-
-def parse_clarify_response(text: str) -> tuple:
-    """Parse CLARIFY response into question and options."""
-    lines = text.strip().split('\n')
-    question = lines[0].strip() if lines else ""
-    options = {}
-    
-    for line in lines[1:]:
-        line = line.strip()
-        if line and len(line) > 2 and line[1] == ')':
-            key = line[0]
-            if key.isdigit():
-                options[key] = line[3:].strip()
-    
-    return (question, options)
-
-def get_scout_cmd(user_input: str, cwd: str, rejected: str = "") -> str:
-    """Generate a single scout command."""
-    shell_context = ensure_shell_context()
-    
-    reject_section = f"\nPrevious scout command was rejected: {rejected}" if rejected else ""
-    
-    scout_prompt = f"""Generate ONE scout command to gather context for this request.
+PROMPT_SINGLE = """You are a shell command translator. Convert the user's request into a shell command.
 
 {shell_context}
-Current directory: {cwd}{reject_section}
+Current directory: {cwd}
+
+Recent command history:
+{history}{regen_section}{clarification_section}
 
 Rules:
 - Output ONLY the command, nothing else
-- NO sudo allowed
-- Keep it minimal and fast
-- Common scouts: ls, cat, which, find (not root), grep, head, du
+- No explanations, no markdown, no backticks
+- If the request is ambiguous or vague, respond with: CLARIFY: <question>
+  1) <option 1>
+  2) <option 2>
+  ...
+  0) custom (describe what you want)
+- Learn from previous attempts - if a similar command was rejected, try a different approach
+- Otherwise, make a reasonable assumption
+- Prefer simple, common commands
+- Prefer using available aliases/abbreviations when they match
 
-Request: {user_input}
+User request: {user_input}"""
 
-Output only the single scout command:"""
-    
-    try:
-        with AwaitIndicator():
-            response = _client.chat.completions.create(
-                model=os.environ["NLSH_MODEL"],
-                messages=[{"role": "user", "content": scout_prompt}],
-                max_tokens=100,
-                timeout=TIMEOUT,
-            )
-        cmd = response.choices[0].message.content.strip()
-        # Clean up markdown if present
-        if cmd.startswith('```'):
-            cmd = cmd.split('\n', 1)[1] if '\n' in cmd else ''
-        if cmd.endswith('```'):
-            cmd = cmd.rsplit('```', 1)[0]
-        # Remove backticks
-        cmd = cmd.strip('`').strip()
-        return cmd if cmd else None
-    except:
-        return None
+PROMPT_MULTI = """You are a shell command translator. Generate exactly 3 different command options for the user's request.
 
-def scout_and_get_commands(user_input: str, cwd: str) -> list:
-    """Let model scout the environment first, then generate commands."""
-    history_context = format_history()
-    shell_context = ensure_shell_context()
-    
-    # Step 1: Ask model what to scout
-    scout_prompt = f"""You are scouting a shell environment. What commands should you run to understand the context for this request?
+{shell_context}
+Current directory: {cwd}
+
+Recent command history:
+{history}{regen_section}{clarification_section}
+
+Rules:
+- Output exactly 3 commands, one per line, numbered 1-3
+- Include a very brief description after // (max 5 words)
+- Each command should be a different approach
+- No markdown, no backticks
+- Format: 1) <command> // <5 word max>
+- Learn from previous attempts
+- Prefer simple, common commands
+
+User request: {user_input}"""
+
+PROMPT_SCOUT_LIST = """You are scouting a shell environment. What commands should you run to understand the context for this request?
 
 {shell_context}
 Current directory: {cwd}
@@ -143,94 +77,326 @@ Rules:
 Request: {user_input}
 
 Output only the scout commands, nothing else:"""
-    
-    try:
-        with AwaitIndicator():
-            response = _client.chat.completions.create(
-                model=os.environ["NLSH_MODEL"],
-                messages=[{"role": "user", "content": scout_prompt}],
-                max_tokens=256,
-                timeout=TIMEOUT,
+
+PROMPT_SCOUT_SINGLE = """Generate ONE scout command to gather context for this request.
+
+{shell_context}
+Current directory: {cwd}{reject_section}
+
+Rules:
+- Output ONLY the command, nothing else
+- NO sudo allowed
+- Keep it minimal and fast
+- Common scouts: ls, cat, which, find (not root), grep, head, du
+
+Request: {user_input}
+
+Output only the single scout command:"""
+
+# --- Client ---
+
+def init_client(config):
+    global _client
+    _client = OpenAI(api_key=config.api_key, base_url=config.base_url)
+
+
+def reinit_client(config):
+    global _client
+    _client = OpenAI(api_key=config.api_key, base_url=config.base_url)
+
+
+def _call_api(messages, max_tokens=256):
+    with AwaitIndicator():
+        response = _client.chat.completions.create(
+            model=os.environ["NLSH_MODEL"],
+            messages=messages,
+            max_tokens=max_tokens,
+            timeout=TIMEOUT,
+        )
+    return response.choices[0].message.content.strip()
+
+
+# --- Response Parsing ---
+
+def clean_cmd(text):
+    """Strip markdown and backticks from LLM output."""
+    cmd = text.strip()
+    if cmd.startswith("```"):
+        cmd = cmd.split("\n", 1)[1] if "\n" in cmd else ""
+    if cmd.endswith("```"):
+        cmd = cmd.rsplit("```", 1)[0]
+    return cmd.strip("`").strip()
+
+
+def parse_multi_commands(text):
+    """Parse numbered command list into list of Commands."""
+    commands = []
+    for line in text.split("\n"):
+        line = line.strip()
+        if line and len(line) > 2 and line[0].isdigit() and line[1] in ") .":
+            rest = line[2:].strip()
+            if "//" in rest:
+                cmd, desc = rest.split("//", 1)
+                commands.append(Command(cmd=cmd.strip(), desc=desc.strip()))
+            else:
+                commands.append(Command(cmd=rest.strip()))
+    return commands
+
+
+def parse_clarify_response(text):
+    """Parse CLARIFY response into ClarifyData."""
+    lines = text.strip().split("\n")
+    question = lines[0].strip() if lines else ""
+    options = {}
+    for line in lines[1:]:
+        line = line.strip()
+        if line and len(line) > 2 and line[1] == ")":
+            key = line[0]
+            if key.isdigit():
+                options[key] = line[3:].strip()
+    return ClarifyData(question=question, options=options)
+
+
+# --- Shell Context ---
+
+def get_shell_context():
+    shell = os.environ.get("SHELL", "/bin/bash")
+    lines = [f"Shell: {shell}"]
+
+    if "fish" in shell:
+        try:
+            result = subprocess.run(
+                ["fish", "-c", "abbr --show"],
+                capture_output=True, text=True, timeout=2,
             )
-        scout_cmds = response.choices[0].message.content.strip().split('\n')
-        scout_cmds = [c.strip() for c in scout_cmds if c.strip() and 'sudo' not in c]
-        scout_cmds = [c for c in scout_cmds if not c.startswith('```') and not c == '']
-        scout_cmds = scout_cmds[:5]  # Max 5
-    except:
-        scout_cmds = ['ls -la', 'pwd']
-    
-    # Step 2: Run scout commands with approval
-    print(f"\033[36mScouting...\033[0m")
+            if result.returncode == 0 and result.stdout.strip():
+                abbrs = [
+                    l for l in result.stdout.strip().split("\n")[:10] if l
+                ]
+                if abbrs:
+                    lines.append("Fish abbreviations:")
+                    lines.extend(abbrs[:10])
+        except Exception:
+            pass
+    else:
+        try:
+            result = subprocess.run(
+                [shell, "-ic", "alias"],
+                capture_output=True, text=True, timeout=2,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                aliases = [
+                    l
+                    for l in result.stdout.strip().split("\n")[:10]
+                    if l and not l.startswith("#")
+                ]
+                if aliases:
+                    lines.append("Aliases:")
+                    lines.extend(aliases[:10])
+        except Exception:
+            pass
+
+    return "\n".join(lines)
+
+
+def ensure_shell_context():
+    global _shell_context
+    if _shell_context is None:
+        _shell_context = get_shell_context()
+    return _shell_context
+
+
+# --- Command Generation ---
+
+def _build_sections(clarification, store):
+    """Build shared prompt sections from clarification and history."""
+    clarification_section = (
+        f"\n\nClarification: {clarification}" if clarification else ""
+    )
+    regen = store.format_regen_history()
+    regen_section = (
+        f"\n\nPrevious attempts:\n{regen}"
+        if regen != "No previous attempts."
+        else ""
+    )
+    return clarification_section, regen_section
+
+
+def get_command(user_input, cwd, store, clarification=""):
+    history = store.format_history()
+    shell_ctx = ensure_shell_context()
+    cs, rs = _build_sections(clarification, store)
+
+    prompt = PROMPT_SINGLE.format(
+        shell_context=shell_ctx,
+        cwd=cwd,
+        history=history,
+        regen_section=rs,
+        clarification_section=cs,
+        user_input=user_input,
+    )
+
+    try:
+        result = _call_api([{"role": "user", "content": prompt}])
+
+        if "\nCLARIFY:" in result or result.startswith("CLARIFY:"):
+            idx = result.find("CLARIFY:")
+            clarify_text = result[idx + 8:].strip()
+            return (None, parse_clarify_response(clarify_text))
+        return (clean_cmd(result), None)
+    except Exception as e:
+        if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+            raise TimeoutError("Request timed out")
+        raise
+
+
+def get_commands(user_input, cwd, store, clarification=""):
+    history = store.format_history()
+    shell_ctx = ensure_shell_context()
+    cs, rs = _build_sections(clarification, store)
+
+    prompt = PROMPT_MULTI.format(
+        shell_context=shell_ctx,
+        cwd=cwd,
+        history=history,
+        regen_section=rs,
+        clarification_section=cs,
+        user_input=user_input,
+    )
+
+    try:
+        result = _call_api([{"role": "user", "content": prompt}])
+        commands = parse_multi_commands(result)
+        if len(commands) >= 3:
+            return commands[:3]
+        single, _ = get_command(user_input, cwd, store, clarification)
+        if single:
+            return [Command(cmd=single)]
+        return [Command(cmd="echo 'no command generated'")]
+    except TimeoutError:
+        raise
+    except Exception:
+        raise
+
+
+def get_scout_cmd(user_input, cwd, rejected=""):
+    shell_ctx = ensure_shell_context()
+    reject_section = (
+        f"\nPrevious scout command was rejected: {rejected}" if rejected else ""
+    )
+
+    prompt = PROMPT_SCOUT_SINGLE.format(
+        shell_context=shell_ctx,
+        cwd=cwd,
+        reject_section=reject_section,
+        user_input=user_input,
+    )
+
+    try:
+        result = _call_api([{"role": "user", "content": prompt}], max_tokens=100)
+        cmd = clean_cmd(result)
+        return cmd if cmd else None
+    except Exception:
+        return None
+
+
+def scout_and_get_commands(user_input, cwd, store):
+    shell_ctx = ensure_shell_context()
+
+    # Step 1: Get scout command list
+    prompt = PROMPT_SCOUT_LIST.format(
+        shell_context=shell_ctx, cwd=cwd, user_input=user_input
+    )
+
+    try:
+        result = _call_api([{"role": "user", "content": prompt}])
+        scout_cmds = [
+            c.strip()
+            for c in result.strip().split("\n")
+            if c.strip() and "sudo" not in c.strip()
+        ]
+        scout_cmds = [
+            c for c in scout_cmds if not c.startswith("```") and c != ""
+        ]
+        scout_cmds = scout_cmds[:5]
+    except Exception:
+        scout_cmds = ["ls -la", "pwd"]
+
+    # Step 2: Run scouts with approval
+    print("\033[36mScouting...\033[0m")
     scout_results = []
-    safe_cmds = ['ls', 'cat', 'which', 'pwd', 'grep', 'head', 'tail', 'find .', 'du']
-    
+    blocked = {"find / ", " rm ", " dd ", "mkfs", "sudo", " > "}
+
     for i, cmd in enumerate(scout_cmds, 1):
-        # Block slow/dangerous patterns
-        blocked = False
-        if cmd.strip().startswith('find / ') or ' rm ' in cmd or cmd.startswith('rm ') or ' dd ' in cmd or 'mkfs' in cmd or 'sudo' in cmd or ' > ' in cmd:
-            blocked = True
-        if blocked:
+        if cmd.startswith("rm ") or any(p in cmd for p in blocked):
             print(f"  {i}. $ {cmd} \033[31m[blocked]\033[0m")
             continue
-        
-        # Ask for approval
+
         print(f"  {i}. $ {cmd}")
-        print(f"  [Enter=run s=skip r=regen Esc=cancel]", end='', flush=True)
+        print("  [Enter=run s=skip r=regen Esc=cancel]", end="", flush=True)
         key = get_single_key()
-        print()  # Newline after input
-        
-        if key == '\x1b':  # Esc - cancel scout
+        print()
+
+        if key == "\x1b":
             print("\033[33mScout cancelled\033[0m")
             break
-        elif key == 's' or key == 'S':  # Skip
-            print(f"  \033[90m[skipped]\033[0m")
+        elif key in ("s", "S"):
+            print("  \033[90m[skipped]\033[0m")
             continue
-        elif key == 'r' or key == 'R':  # Regen - get new scout cmd
-            print(f"  \033[90m[regenerating...]\033[0m")
+        elif key in ("r", "R"):
+            print("  \033[90m[regenerating...]\033[0m")
             new_cmd = get_scout_cmd(user_input, cwd, cmd)
             if new_cmd and new_cmd not in scout_cmds:
                 scout_cmds.insert(i, new_cmd)
             continue
-        elif key == '\r' or key == '\n':  # Run
+        elif key in ("\r", "\n"):
             start = time.time()
             try:
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                result = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=10
+                )
                 elapsed = int(time.time() - start)
-                status = "\033[32m✓\033[0m" if result.returncode == 0 else "\033[31m✗\033[0m"
+                status = (
+                    "\033[32m✓\033[0m"
+                    if result.returncode == 0
+                    else "\033[31m✗\033[0m"
+                )
                 print(f"  {status} \033[90m{elapsed}s\033[0m")
                 if result.returncode != 0:
-                    print(f"  \033[36m[r=regen s=skip]\033[0m", end='', flush=True)
+                    print(
+                        "  \033[36m[r=regen s=skip]\033[0m", end="", flush=True
+                    )
                     retry = get_single_key()
                     print()
-                    if retry == 'r' or retry == 'R':
-                        print(f"  \033[90m[regenerating...]\033[0m")
+                    if retry in ("r", "R"):
+                        print("  \033[90m[regenerating...]\033[0m")
                         new_cmd = get_scout_cmd(user_input, cwd, cmd)
                         if new_cmd:
                             scout_cmds.insert(i, new_cmd)
                         continue
-                output = (result.stdout + result.stderr)
+                output = result.stdout + result.stderr
                 scout_results.append(f"$ {cmd}\n{output[:500]}")
             except subprocess.TimeoutExpired:
                 print(f"  \033[31m✗ (timeout)\033[0m")
-                print(f"  \033[36m[r=regen s=skip]\033[0m", end='', flush=True)
+                print("  \033[36m[r=regen s=skip]\033[0m", end="", flush=True)
                 retry = get_single_key()
                 print()
-                if retry == 'r' or retry == 'R':
-                    print(f"  \033[90m[regenerating...]\033[0m")
+                if retry in ("r", "R"):
+                    print("  \033[90m[regenerating...]\033[0m")
                     new_cmd = get_scout_cmd(user_input, cwd, cmd)
                     if new_cmd:
                         scout_cmds.insert(i, new_cmd)
                     continue
         else:
-            print(f"  \033[90m[skipped]\033[0m")
+            print("  \033[90m[skipped]\033[0m")
             continue
-    
+
     # Step 3: Generate commands with scout context
     scout_context = "\n\n".join(scout_results)
-    
-    prompt = f"""You are a shell command translator. Generate exactly 3 different command options for the user's request.
 
-{shell_context}
+    gen_prompt = f"""You are a shell command translator. Generate exactly 3 different command options for the user's request.
+
+{shell_ctx}
 Current directory: {cwd}
 
 Scout results:
@@ -247,152 +413,15 @@ Rules:
 User request: {user_input}"""
 
     try:
-        with AwaitIndicator():
-            response = _client.chat.completions.create(
-                model=os.environ["NLSH_MODEL"],
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=256,
-                timeout=TIMEOUT,
-            )
-        result = response.choices[0].message.content.strip()
-        
-        commands = []
-        for line in result.split('\n'):
-            line = line.strip()
-            if line and len(line) > 2:
-                if line[0].isdigit() and line[1] in ') .':
-                    rest = line[2:].strip()
-                    if '//' in rest:
-                        cmd, desc = rest.split('//', 1)
-                        commands.append((cmd.strip(), desc.strip()))
-                    else:
-                        commands.append((rest.strip(), ""))
-        
+        result = _call_api([{"role": "user", "content": gen_prompt}])
+        commands = parse_multi_commands(result)
         if len(commands) >= 3:
             return commands[:3]
-        
-        # Fallback
-        single = get_command(user_input, cwd, "")
-        if single and single[0]:
-            return [(single[0], "")]
-        return [("echo 'no command generated'", "")]
-        
+        single, _ = get_command(user_input, cwd, store, "")
+        if single:
+            return [Command(cmd=single)]
+        return [Command(cmd="echo 'no command generated'")]
     except TimeoutError:
         raise
-    except Exception as e:
-        raise
-
-def get_commands(user_input: str, cwd: str, clarification: str = "") -> list:
-    """Generate 3 command options with descriptions for the user request."""
-    history_context = format_history()
-    shell_context = ensure_shell_context()
-    regen_context = format_regen_history()
-    
-    clarification_section = f"\n\nClarification: {clarification}" if clarification else ""
-    regen_section = f"\n\nPrevious attempts:\n{regen_context}" if regen_context != "No previous attempts." else ""
-    
-    prompt = f"""You are a shell command translator. Generate exactly 3 different command options for the user's request.
-
-{shell_context}
-Current directory: {cwd}
-
-Recent command history:
-{history_context}{regen_section}{clarification_section}
-
-Rules:
-- Output exactly 3 commands, one per line, numbered 1-3
-- Include a very brief description after // (max 5 words)
-- Each command should be a different approach
-- No markdown, no backticks
-- Format: 1) <command> // <5 word max>
-- Learn from previous attempts
-- Prefer simple, common commands
-
-User request: {user_input}"""
-
-    try:
-        with AwaitIndicator():
-            response = _client.chat.completions.create(
-                model=os.environ["NLSH_MODEL"],
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=256,
-                timeout=TIMEOUT,
-            )
-        result = response.choices[0].message.content.strip()
-        
-        # Parse numbered commands with descriptions
-        commands = []
-        for line in result.split('\n'):
-            line = line.strip()
-            if line and len(line) > 2:
-                if line[0].isdigit() and line[1] in ') .':
-                    rest = line[2:].strip()
-                    # Split on // for description
-                    if '//' in rest:
-                        cmd, desc = rest.split('//', 1)
-                        commands.append((cmd.strip(), desc.strip()))
-                    else:
-                        commands.append((rest.strip(), ""))
-        
-        if len(commands) >= 3:
-            return commands[:3]
-        
-        # Fallback
-        single = get_command(user_input, cwd, clarification)
-        if single and single[0]:
-            return [(single[0], "")]
-        return [("echo 'no command generated'", "")]
-        
-    except TimeoutError:
-        raise
-    except Exception as e:
-        raise
-
-def get_command(user_input: str, cwd: str, clarification: str = "") -> tuple:
-    history_context = format_history()
-    shell_context = ensure_shell_context()
-    regen_context = format_regen_history()
-    
-    clarification_section = f"\n\nClarification: {clarification}" if clarification else ""
-    regen_section = f"\n\nPrevious attempts:\n{regen_context}" if regen_context != "No previous attempts." else ""
-    
-    prompt = f"""You are a shell command translator. Convert the user's request into a shell command.
-
-{shell_context}
-Current directory: {cwd}
-
-Recent command history:
-{history_context}{regen_section}{clarification_section}
-
-Rules:
-- Output ONLY the command, nothing else
-- No explanations, no markdown, no backticks
-- If the request is ambiguous or vague, respond with: CLARIFY: <question>\n  1) <option 1>\n  2) <option 2>\n  ...\n  0) custom (describe what you want)
-- Learn from previous attempts - if a similar command was rejected, try a different approach
-- Otherwise, make a reasonable assumption
-- Prefer simple, common commands
-- Prefer using available aliases/abbreviations when they match
-
-User request: {user_input}"""
-
-    try:
-        with AwaitIndicator():
-            response = _client.chat.completions.create(
-                model=os.environ["NLSH_MODEL"],
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=256,
-                timeout=TIMEOUT,
-            )
-        result = response.choices[0].message.content.strip()
-        
-        # Check if model is asking for clarification (may be after command)
-        if "\nCLARIFY:" in result or result.startswith("CLARIFY:"):
-            clarify_idx = result.find("CLARIFY:")
-            clarify_text = result[clarify_idx + 8:].strip()
-            question, options = parse_clarify_response(clarify_text)
-            return (None, (question, options))
-        return (result, None)
-    except Exception as e:
-        if "timeout" in str(e).lower() or "timed out" in str(e).lower():
-            raise TimeoutError("Request timed out")
+    except Exception:
         raise

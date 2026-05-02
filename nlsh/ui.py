@@ -3,9 +3,9 @@
 # Purpose: Terminal UI components and user interaction
 #
 # This module:
-# - Handles single keypress reading
-# - Displays help and config info
-# - Manages await indicator
+# - Handles single keypress reading and line editing
+# - Displays help, config, command options
+# - Manages await indicator and clarification prompts
 
 import sys
 import os
@@ -17,18 +17,20 @@ import select
 
 TIMEOUT = 30
 
+
 def get_single_key():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(sys.stdin.fileno())
         ch = sys.stdin.read(1)
-        if ch == '\x1b':
+        if ch == "\x1b":
             while select.select([sys.stdin], [], [], 0.05)[0]:
                 ch += sys.stdin.read(1)
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
+
 
 def raw_input(prompt: str) -> str:
     sys.stdout.write(prompt)
@@ -40,16 +42,16 @@ def raw_input(prompt: str) -> str:
     pos = 0
 
     def redraw():
-        sys.stdout.write('\r' + prompt + ''.join(buffer))
-        sys.stdout.write('\r' + prompt + ''.join(buffer[:pos]))
+        sys.stdout.write("\r" + prompt + "".join(buffer))
+        sys.stdout.write("\r" + prompt + "".join(buffer[:pos]))
         sys.stdout.flush()
 
     def delete_word_backward():
         nonlocal pos
-        while pos > 0 and buffer[pos - 1] == ' ':
+        while pos > 0 and buffer[pos - 1] == " ":
             pos -= 1
             buffer.pop(pos)
-        while pos > 0 and buffer[pos - 1] != ' ':
+        while pos > 0 and buffer[pos - 1] != " ":
             pos -= 1
             buffer.pop(pos)
 
@@ -58,47 +60,47 @@ def raw_input(prompt: str) -> str:
         while True:
             ch = sys.stdin.read(1)
 
-            if ch == '\x1b':
+            if ch == "\x1b":
                 while select.select([sys.stdin], [], [], 0.03)[0]:
                     ch += sys.stdin.read(1)
                 seq = ch
-                if seq == '\x1b':
+                if seq == "\x1b":
                     print()
                     return ""
-                elif seq in ('\x1b[C', '\x1bOC'):  # Right
+                elif seq in ("\x1b[C", "\x1bOC"):
                     if pos < len(buffer):
                         pos += 1
                         redraw()
-                elif seq in ('\x1b[D', '\x1bOD'):  # Left
+                elif seq in ("\x1b[D", "\x1bOD"):
                     if pos > 0:
                         pos -= 1
                         redraw()
-                elif seq in ('\x1b[H', '\x1b[1~', '\x1bOH'):  # Home
+                elif seq in ("\x1b[H", "\x1b[1~", "\x1bOH"):
                     pos = 0
                     redraw()
-                elif seq in ('\x1b[F', '\x1b[4~', '\x1bOF'):  # End
+                elif seq in ("\x1b[F", "\x1b[4~", "\x1bOF"):
                     pos = len(buffer)
                     redraw()
-                elif seq == '\x1b[3~':  # Delete
+                elif seq == "\x1b[3~":
                     if pos < len(buffer):
                         buffer.pop(pos)
                         redraw()
-            elif ch == '\r' or ch == '\n':
+            elif ch in ("\r", "\n"):
                 print()
-                return ''.join(buffer)
-            elif ch == '\x7f' or ch == '\x08':
+                return "".join(buffer)
+            elif ch in ("\x7f", "\x08"):
                 if pos > 0:
                     pos -= 1
                     buffer.pop(pos)
                     redraw()
-            elif ch == '\x17':  # Ctrl+W
+            elif ch == "\x17":
                 delete_word_backward()
                 redraw()
-            elif ch == '\x15':  # Ctrl+U
+            elif ch == "\x15":
                 buffer = buffer[pos:]
                 pos = 0
                 redraw()
-            elif ch == '\x03':
+            elif ch == "\x03":
                 print()
                 return ""
             elif ch.isprintable():
@@ -107,6 +109,7 @@ def raw_input(prompt: str) -> str:
                 redraw()
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
 
 class AwaitIndicator:
     def __init__(self, timeout: int = TIMEOUT):
@@ -131,11 +134,17 @@ class AwaitIndicator:
     def _tick(self):
         while not self.stop_event.is_set():
             elapsed = int(time.time() - self.start_time)
-            sys.stdout.write(f"\r\033[33m[awaiting API response...] ({elapsed}s/{self.timeout}s)\033[0m")
+            sys.stdout.write(
+                f"\r\033[33m[awaiting API response...] "
+                f"({elapsed}s/{self.timeout}s)\033[0m"
+            )
             sys.stdout.flush()
             time.sleep(0.1)
             if elapsed >= self.timeout:
                 break
+
+
+# --- Display Functions ---
 
 def show_help():
     print("\033[36mType plain English to generate shell commands\033[0m")
@@ -146,14 +155,58 @@ def show_help():
     print("\033[36m!quit, !q\033[0m   - Exit")
     print()
 
-def show_config(is_loaded_from_config):
-    from .config import REQUIRED_KEYS
-    api_key = os.environ.get("NLSH_API_KEY", "")
-    masked = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "(not set)" if not api_key else api_key
-    source = "env" if not is_loaded_from_config("NLSH_API_KEY") else "config"
-    print(f"\033[36mNLSH_API_KEY:\033[0m {masked} [{source}]")
-    for key in REQUIRED_KEYS:
-        val = os.environ.get(key, "(not set)")
-        source = "env" if not is_loaded_from_config(key) else "config"
-        print(f"\033[36m{key}:\033[0m {val} [{source}]")
+
+def show_config(config):
+    api_key = config.api_key
+    masked = (
+        api_key[:8] + "..." + api_key[-4:]
+        if len(api_key) > 12
+        else "(not set)" if not api_key else api_key
+    )
+    print(f"\033[36mNLSH_API_KEY:\033[0m {masked}")
+    print(f"\033[36mNLSH_BASE_URL:\033[0m {config.base_url or '(not set)'}")
+    print(f"\033[36mNLSH_MODEL:\033[0m {config.model or '(not set)'}")
     print()
+
+
+def show_gen_options(commands):
+    print("\033[36mGenerated commands:\033[0m")
+    for i, cmd in enumerate(commands, 1):
+        if cmd.desc:
+            print(f"  \033[33m{i}\033[0m) \033[35m{cmd.desc}\033[0m")
+            print(f"  ↳ {cmd.cmd}")
+        else:
+            print(f"  \033[33m{i}\033[0m) {cmd.cmd}")
+    print()
+
+
+def show_ask_options():
+    print("\033[36mWhat do you want?\033[0m")
+    print("  \033[33m1\033[0m) Clarify the request")
+    print("  \033[33m2\033[0m) A different command")
+    print("  \033[33m3\033[0m) Modify this command")
+    print("  \033[33m4\033[0m) Safer/alternative approach")
+    print("  \033[33m5\033[0m) Something completely different")
+    print("  \033[33m0\033[0m) Custom description")
+    print("  \033[33mEsc\033[0m) Cancel")
+    print()
+
+
+# --- Interactive Prompts ---
+
+def prompt_clarify(clarify):
+    print(f"\033[36m{clarify.question}\033[0m")
+    for key in sorted(clarify.options.keys()):
+        print(f"  \033[33m{key}\033[0m) {clarify.options[key]}")
+    print()
+
+    answer = raw_input("\033[33mSelect 1-0, or type answer: \033[0m")
+    if not answer:
+        return ""
+
+    if answer in clarify.options:
+        if answer == "0" and "custom" in clarify.options.get("0", "").lower():
+            custom = raw_input("\033[33mDescribe: \033[0m")
+            return custom
+        return clarify.options[answer]
+    return answer
