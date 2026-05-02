@@ -35,9 +35,9 @@ export NLSH_MODEL=<model>
 **OpenAI:**
 
 ```bash
-export NLSH_API_KEY=<your-key>
+export NLSH_API_KEY=<api-key>
 export NLSH_BASE_URL=https://api.openai.com/v1
-export NLSH_MODEL=gpt-4.1-mini
+export NLSH_MODEL=<model-name>
 ```
 
 **Ollama:**
