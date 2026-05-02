@@ -16,11 +16,11 @@ nix profile install github:PopCat19/nlsh-nix
 
 Config stored at `~/.config/nlsh/config`:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NLSH_API_KEY` | (required) | Your API key |
-| `NLSH_BASE_URL` | `https://api.openai.com/v1` | API endpoint |
-| `NLSH_MODEL` | `gpt-4.1-mini` | Model to use |
+| Variable | Description |
+|----------|-------------|
+| `NLSH_API_KEY` | Your API key |
+| `NLSH_BASE_URL` | API endpoint |
+| `NLSH_MODEL` | Model to use |
 
 ### Examples
 

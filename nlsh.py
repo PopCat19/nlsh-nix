@@ -20,13 +20,7 @@ signal.signal(signal.SIGINT, exit_handler)
 CONFIG_DIR = os.path.expanduser("~/.config/nlsh")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config")
 
-DEFAULT_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_MODEL = "gpt-4.1-mini"
-DEFAULTS = {
-    "NLSH_API_KEY": "",
-    "NLSH_BASE_URL": DEFAULT_BASE_URL,
-    "NLSH_MODEL": DEFAULT_MODEL,
-}
+REQUIRED_KEYS = ["NLSH_API_KEY", "NLSH_BASE_URL", "NLSH_MODEL"]
 
 def load_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -37,20 +31,17 @@ def load_config():
                 if line and not line.startswith("#") and "=" in line:
                     key, value = line.split("=", 1)
                     os.environ.setdefault(key, value)
-    for key, value in DEFAULTS.items():
-        os.environ.setdefault(key, value)
 
 def save_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         f.write("# nlsh configuration\n")
-        for key in DEFAULTS:
+        for key in REQUIRED_KEYS:
             val = os.environ.get(key, "")
             f.write(f"{key}={val}\n")
 
 def setup_api_key():
-    print(f"\n\033[36mOpenAI-compatible API setup\033[0m")
-    print(f"Defaults: base_url={DEFAULT_BASE_URL}, model={DEFAULT_MODEL}\n")
+    print(f"\n\033[36mOpenAI-compatible API setup\033[0m\n")
 
     api_key = input("\033[33mAPI key: \033[0m").strip()
     if not api_key:
@@ -58,13 +49,17 @@ def setup_api_key():
         sys.exit(1)
     os.environ["NLSH_API_KEY"] = api_key
 
-    base_url = input(f"\033[33mBase URL [{os.environ.get('NLSH_BASE_URL', DEFAULT_BASE_URL)}]: \033[0m").strip()
-    if base_url:
-        os.environ["NLSH_BASE_URL"] = base_url
+    base_url = input("\033[33mBase URL: \033[0m").strip()
+    if not base_url:
+        print("Base URL required.")
+        sys.exit(1)
+    os.environ["NLSH_BASE_URL"] = base_url
 
-    model = input(f"\033[33mModel [{os.environ.get('NLSH_MODEL', DEFAULT_MODEL)}]: \033[0m").strip()
-    if model:
-        os.environ["NLSH_MODEL"] = model
+    model = input("\033[33mModel: \033[0m").strip()
+    if not model:
+        print("Model required.")
+        sys.exit(1)
+    os.environ["NLSH_MODEL"] = model
 
     save_config()
     print("\033[32m✓ Config saved!\033[0m\n")
@@ -77,8 +72,8 @@ def show_help():
     print()
 
 def show_config():
-    print(f"\033[36mBase URL:\033[0m {os.environ.get('NLSH_BASE_URL', DEFAULT_BASE_URL)}")
-    print(f"\033[36mModel:\033[0m    {os.environ.get('NLSH_MODEL', DEFAULT_MODEL)}")
+    print(f"\033[36mBase URL:\033[0m {os.environ.get('NLSH_BASE_URL', '(not set)')}")
+    print(f"\033[36mModel:\033[0m    {os.environ.get('NLSH_MODEL', '(not set)')}")
     key = os.environ.get("NLSH_API_KEY", "")
     masked = key[:8] + "..." + key[-4:] if len(key) > 12 else "(not set)"
     print(f"\033[36mAPI Key:\033[0m  {masked}")
@@ -86,7 +81,7 @@ def show_config():
 
 load_config()
 
-first_run = not os.environ.get("NLSH_API_KEY")
+first_run = not all(os.environ.get(k) for k in REQUIRED_KEYS)
 if first_run:
     setup_api_key()
     print("\033[1mnlsh\033[0m - talk to your terminal\n")
@@ -95,8 +90,8 @@ if first_run:
 from openai import OpenAI
 
 client = OpenAI(
-    api_key=os.environ.get("NLSH_API_KEY"),
-    base_url=os.environ.get("NLSH_BASE_URL", DEFAULT_BASE_URL),
+    api_key=os.environ["NLSH_API_KEY"],
+    base_url=os.environ["NLSH_BASE_URL"],
 )
 
 command_history = []
@@ -147,7 +142,7 @@ Rules:
 User request: {user_input}"""
 
     response = client.chat.completions.create(
-        model=os.environ.get("NLSH_MODEL", DEFAULT_MODEL),
+        model=os.environ["NLSH_MODEL"],
         messages=[{"role": "user", "content": prompt}],
         max_tokens=256,
     )
@@ -193,8 +188,8 @@ def main():
                 setup_api_key()
                 global client
                 client = OpenAI(
-                    api_key=os.environ.get("NLSH_API_KEY"),
-                    base_url=os.environ.get("NLSH_BASE_URL", DEFAULT_BASE_URL),
+                    api_key=os.environ["NLSH_API_KEY"],
+                    base_url=os.environ["NLSH_BASE_URL"],
                 )
                 continue
 
