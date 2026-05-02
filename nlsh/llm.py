@@ -83,6 +83,45 @@ def parse_clarify_response(text: str) -> tuple:
     
     return (question, options)
 
+def get_scout_cmd(user_input: str, cwd: str, rejected: str = "") -> str:
+    """Generate a single scout command."""
+    shell_context = ensure_shell_context()
+    
+    reject_section = f"\nPrevious scout command was rejected: {rejected}" if rejected else ""
+    
+    scout_prompt = f"""Generate ONE scout command to gather context for this request.
+
+{shell_context}
+Current directory: {cwd}{reject_section}
+
+Rules:
+- Output ONLY the command, nothing else
+- NO sudo allowed
+- Keep it minimal and fast
+- Common scouts: ls, cat, which, find (not root), grep, head, du
+
+Request: {user_input}
+
+Output only the single scout command:"""
+    
+    try:
+        with AwaitIndicator():
+            response = _client.chat.completions.create(
+                model=os.environ["NLSH_MODEL"],
+                messages=[{"role": "user", "content": scout_prompt}],
+                max_tokens=100,
+                timeout=TIMEOUT,
+            )
+        cmd = response.choices[0].message.content.strip()
+        # Clean up markdown if present
+        if cmd.startswith('```'):
+            cmd = cmd.split('\n', 1)[1] if '\n' in cmd else ''
+        if cmd.endswith('```'):
+            cmd = cmd.rsplit('```', 1)[0]
+        return cmd.strip() if cmd else None
+    except:
+        return None
+
 def scout_and_get_commands(user_input: str, cwd: str) -> list:
     """Let model scout the environment first, then generate commands."""
     history_context = format_history()
@@ -145,8 +184,11 @@ Output only the scout commands, nothing else:"""
         elif key == 's' or key == 'S':  # Skip
             print(f"  \033[90m[skipped]\033[0m")
             continue
-        elif key == 'r' or key == 'R':  # Regen - skip this one, will add new
-            print(f"  \033[90m[skipped - generate alternative]\033[0m")
+        elif key == 'r' or key == 'R':  # Regen - get new scout cmd
+            print(f"  \033[90m[regenerating...]\033[0m")
+            new_cmd = get_scout_cmd(user_input, cwd, cmd)
+            if new_cmd and new_cmd not in scout_cmds:
+                scout_cmds.insert(i, new_cmd)
             continue
         elif key == '\r' or key == '\n':  # Run
             start = time.time()
