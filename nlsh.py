@@ -22,6 +22,8 @@ CONFIG_PATH = os.path.join(CONFIG_DIR, "config")
 
 REQUIRED_KEYS = ["NLSH_API_KEY", "NLSH_BASE_URL", "NLSH_MODEL"]
 
+_loaded_from_config = set()
+
 def load_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     if os.path.exists(CONFIG_PATH):
@@ -30,7 +32,9 @@ def load_config():
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     key, value = line.split("=", 1)
-                    os.environ.setdefault(key, value)
+                    if key not in os.environ:
+                        os.environ[key] = value
+                        _loaded_from_config.add(key)
 
 def save_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -43,23 +47,26 @@ def save_config():
 def setup_api_key():
     print(f"\n\033[36mOpenAI-compatible API setup\033[0m\n")
 
-    api_key = input("\033[33mAPI key: \033[0m").strip()
-    if not api_key:
-        print("API key required.")
-        sys.exit(1)
-    os.environ["NLSH_API_KEY"] = api_key
+    if not os.environ.get("NLSH_API_KEY"):
+        api_key = input("\033[33mAPI key: \033[0m").strip()
+        if not api_key:
+            print("API key required.")
+            sys.exit(1)
+        os.environ["NLSH_API_KEY"] = api_key
 
-    base_url = input("\033[33mBase URL: \033[0m").strip()
-    if not base_url:
-        print("Base URL required.")
-        sys.exit(1)
-    os.environ["NLSH_BASE_URL"] = base_url
+    if not os.environ.get("NLSH_BASE_URL"):
+        base_url = input("\033[33mBase URL: \033[0m").strip()
+        if not base_url:
+            print("Base URL required.")
+            sys.exit(1)
+        os.environ["NLSH_BASE_URL"] = base_url
 
-    model = input("\033[33mModel: \033[0m").strip()
-    if not model:
-        print("Model required.")
-        sys.exit(1)
-    os.environ["NLSH_MODEL"] = model
+    if not os.environ.get("NLSH_MODEL"):
+        model = input("\033[33mModel: \033[0m").strip()
+        if not model:
+            print("Model required.")
+            sys.exit(1)
+        os.environ["NLSH_MODEL"] = model
 
     save_config()
     print("\033[32m✓ Config saved!\033[0m\n")
@@ -71,17 +78,22 @@ def show_help():
     print("\033[36m!cmd\033[0m       - Run cmd directly")
     print()
 
+def is_configured():
+    return all(os.environ.get(k) for k in REQUIRED_KEYS)
+
 def show_config():
-    print(f"\033[36mBase URL:\033[0m {os.environ.get('NLSH_BASE_URL', '(not set)')}")
-    print(f"\033[36mModel:\033[0m    {os.environ.get('NLSH_MODEL', '(not set)')}")
-    key = os.environ.get("NLSH_API_KEY", "")
-    masked = key[:8] + "..." + key[-4:] if len(key) > 12 else "(not set)"
-    print(f"\033[36mAPI Key:\033[0m  {masked}")
+    for key in REQUIRED_KEYS:
+        val = os.environ.get(key, "(not set)")
+        source = "env" if key not in _loaded_from_config else "config"
+        print(f"\033[36m{key}:\033[0m {val} [{source}]")
     print()
 
 load_config()
 
-first_run = not all(os.environ.get(k) for k in REQUIRED_KEYS)
+def is_configured():
+    return all(os.environ.get(k) for k in REQUIRED_KEYS)
+
+first_run = not is_configured()
 if first_run:
     setup_api_key()
     print("\033[1mnlsh\033[0m - talk to your terminal\n")
