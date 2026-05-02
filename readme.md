@@ -33,6 +33,7 @@ Start nlsh, type natural language, get shell commands:
 | `!config` | Show current configuration |
 | `!help` | Show available commands |
 | `!cmd <shell>` | Run shell command directly |
+| `!quit`, `!q` | Exit |
 | `Ctrl+D` | Exit |
 
 ### Behavior

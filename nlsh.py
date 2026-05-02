@@ -45,25 +45,29 @@ def save_config():
             f.write(f"{key}={os.environ.get(key, '')}\n")
 
 def setup_api_key():
-    print(f"\n\033[36mOpenAI-compatible API setup\033[0m\n")
+    print(f"\n\033[36mOpenAI-compatible API setup\033[0m")
+    if is_configured():
+        print("\033[33mConfig already set. Press Enter to keep current values.\033[0m\n")
+    else:
+        print()
 
     api_key = input("\033[33mAPI key (enter to skip): \033[0m").strip()
     if api_key:
         os.environ["NLSH_API_KEY"] = api_key
 
-    if not os.environ.get("NLSH_BASE_URL"):
-        base_url = input("\033[33mBase URL: \033[0m").strip()
-        if not base_url:
-            print("Base URL required.")
-            sys.exit(1)
+    base_url = input(f"\033[33mBase URL [{os.environ.get('NLSH_BASE_URL', '')}]: \033[0m").strip()
+    if base_url:
         os.environ["NLSH_BASE_URL"] = base_url
+    elif not os.environ.get("NLSH_BASE_URL"):
+        print("Base URL required.")
+        sys.exit(1)
 
-    if not os.environ.get("NLSH_MODEL"):
-        model = input("\033[33mModel: \033[0m").strip()
-        if not model:
-            print("Model required.")
-            sys.exit(1)
+    model = input(f"\033[33mModel [{os.environ.get('NLSH_MODEL', '')}]: \033[0m").strip()
+    if model:
         os.environ["NLSH_MODEL"] = model
+    elif not os.environ.get("NLSH_MODEL"):
+        print("Model required.")
+        sys.exit(1)
 
     save_config()
     print("\033[32m✓ Config saved!\033[0m\n")
@@ -72,7 +76,8 @@ def show_help():
     print("\033[36m!api\033[0m       - Change API key/config")
     print("\033[36m!config\033[0m   - Show current config")
     print("\033[36m!help\033[0m      - Show this help")
-    print("\033[36m!cmd\033[0m       - Run cmd directly")
+    print("\033[36m!cmd <cmd>\033[0m  - Run shell command directly")
+    print("\033[36m!quit, !q\033[0m   - Exit")
     print()
 
 def is_configured():
@@ -196,6 +201,10 @@ def main():
             elif user_input == "cd":
                 os.chdir(os.path.expanduser("~"))
                 continue
+
+            if user_input in ("!quit", "!q"):
+                print("\033[32mbye\033[0m")
+                sys.exit(0)
 
             if user_input == "!api":
                 setup_api_key()
