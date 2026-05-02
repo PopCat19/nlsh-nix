@@ -19,7 +19,7 @@
           pypkgs = python.pkgs;
           nlsh-pkg = pypkgs.buildPythonPackage {
             pname = "nlsh";
-            version = "0.1.0";
+            version = self.lastModifiedDate;
             pyproject = false;
 
             src = ./.;
@@ -40,7 +40,7 @@
           python-with-nlsh = python.withPackages (ps: [ nlsh-pkg ps.openai ]);
         in
         {
-          default = pkgs.runCommand "nlsh-nix-0.1.0" {
+          default = pkgs.runCommand "nlsh-nix-${self.lastModifiedDate}" {
             meta = {
               description = "Natural language shell (NixOS-compatible)";
               homepage = "https://github.com/PopCat19/nlsh-nix";
