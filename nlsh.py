@@ -14,6 +14,7 @@ import tty
 import termios
 import threading
 import time
+import select
 
 def exit_handler(sig, frame):
     print()
@@ -140,9 +141,11 @@ def get_single_key():
     try:
         tty.setraw(sys.stdin.fileno())
         ch = sys.stdin.read(1)
-        # Handle escape sequences (arrow keys, etc)
+        # Handle escape sequences (arrow keys, etc) only if more bytes available
         if ch == '\x1b':
-            ch += sys.stdin.read(2)  # Read rest of escape sequence
+            # Check if there are more characters waiting
+            if select.select([sys.stdin], [], [], 0.1)[0]:
+                ch += sys.stdin.read(2)  # Read rest of escape sequence
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
