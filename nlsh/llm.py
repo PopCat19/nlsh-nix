@@ -130,7 +130,8 @@ Output only the scout commands, nothing else:"""
             continue
         
         # Ask for approval
-        print(f"  {i}. $ {cmd} \033[36m[Enter=run s=skip Esc=cancel scout]\033[0m")
+        print(f"  {i}. $ {cmd}")
+        print(f"  \033[36m[Enter=run s=skip Esc=cancel]\033[0m")
         key = get_single_key()
         
         if key == '\x1b':  # Esc - cancel scout
@@ -146,6 +147,9 @@ Output only the scout commands, nothing else:"""
                 elapsed = int(time.time() - start)
                 print(f"  {i}. $ {cmd} \033[32m({elapsed}s/10s)\033[0m")
                 output = (result.stdout + result.stderr)[:500]
+                if output.strip():
+                    for line in output.strip().split('\n')[:10]:
+                        print(f"     {line}")
                 scout_results.append(f"$ {cmd}\n{output}")
             except subprocess.TimeoutExpired:
                 print(f"  {i}. $ {cmd} \033[31m[timeout]\033[0m")
