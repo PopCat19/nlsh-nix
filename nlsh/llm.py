@@ -98,8 +98,11 @@ User request: {user_input}"""
             )
         result = response.choices[0].message.content.strip()
         
-        if result.startswith("CLARIFY:"):
-            return (None, result[8:].strip())
+        # Check if model is asking for clarification (may be after command)
+        if "\nCLARIFY:" in result or result.startswith("CLARIFY:"):
+            clarify_idx = result.find("CLARIFY:")
+            clarify_q = result[clarify_idx + 8:].strip()
+            return (None, clarify_q)
         return (result, None)
     except Exception as e:
         if "timeout" in str(e).lower() or "timed out" in str(e).lower():
