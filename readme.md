@@ -4,52 +4,69 @@ NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) wi
 
 ## Usage
 
-Start nlsh, type natural language, get shell commands:
+### One-shot mode
 
-```
-15:41:22 ~
-❯ list all python files
+```bash
+nlsh list all python files
+[awaiting API response...] (1s/30s)
 → find . -name "*.py"
-./main.py
-./utils/helper.py
+[Enter=run r=regen Esc=cancel]
+```
 
-15:41:36 ~/projects
-❯ commit with message fixed the bug
-→ git commit -m "fixed the bug"
-[main abc123] fixed the bug
- 2 files changed, 5 insertions(+)
+Press `Enter` to run, `r` to regenerate, `Esc` to cancel.
 
-15:41:41 ~/projects
-❯ find files larger than 100MB
-→ find . -size +100M
-./data/archive.tar.gz
+### REPL mode
+
+```bash
+nlsh
+nlsh 3544591 (20260502) - model: gemma4:31b
+
+!api       - Change API key/config
+!config   - Show current config
+!help      - Show this help
+!cmd <cmd>  - Run shell command directly
+!quit, !q   - Exit
+
+popcat19 > list all python files
+[awaiting API response...] (1s/30s)
+→ find . -name "*.py"
+[Enter=run r=regen Esc=cancel] _
 ```
 
 ### Commands
 
 | Command | Description |
 |--------|-------------|
-| `!api` | Reconfigure API key/base URL/model |
+| `!api` | Interactive menu for API config |
 | `!config` | Show current configuration |
 | `!help` | Show available commands |
 | `!cmd <shell>` | Run shell command directly |
 | `!quit`, `!q` | Exit |
 | `Ctrl+D` | Exit |
 
+### Confirmation keys
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Run the suggested command |
+| `r` | Regenerate suggestion |
+| `Esc` | Cancel (back to prompt) |
+
 ### Behavior
 
 - Type naturally → suggests a shell command
-- Press Enter to execute, type anything else to cancel
 - Shell commands (`ls`, `git`, `nix`, etc.) run directly without LLM
 - `cd` works natively for directory navigation
+- Shell-aware: uses your aliases (bash/zsh) and abbreviations (fish)
+- 30s timeout with progress indicator
 
 ### First run
 
 Prompts for:
 
-1. API key (press Enter to skip for local services)
-2. Base URL (e.g. `https://api.openai.com/v1`)
-3. Model name (e.g. `gpt-4.1-mini`, `llama3.2`)
+1. Base URL (required)
+2. Model (required)
+3. API key (optional - skip for local services)
 
 ## Configuration
 
@@ -61,13 +78,7 @@ Config stored at `~/.config/nlsh/config`:
 | `NLSH_MODEL` | yes | Model to use |
 | `NLSH_API_KEY` | no | API key (skip for local services) |
 
-**Env vars take precedence over config file.** Set values in your shell to skip prompts or override:
-
-```bash
-export NLSH_API_KEY=<api-key>
-export NLSH_BASE_URL=<base-url>
-export NLSH_MODEL=<model>
-```
+**Env vars take precedence over config file.**
 
 ### Examples
 
@@ -141,4 +152,8 @@ rm -rf ~/.config/nlsh
 - OpenAI-compatible API (supports OpenAI, Ollama, vLLM, etc.)
 - Fixed shebang for NixOS compatibility
 - Config at `~/.config/nlsh/config` (XDG-friendly)
-- Added `nix` commands to shell detection
+- One-shot mode with command-line args
+- Shell context (aliases/fish abbr) included in prompts
+- Single-key confirmation (Enter/r/Esc)
+- Timeout indicator with progress
+- Interactive `!api` menu with cancel option
