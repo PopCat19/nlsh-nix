@@ -128,9 +128,11 @@ def show_gen_options(commands: list):
     for i, item in enumerate(commands, 1):
         if isinstance(item, tuple):
             cmd, desc = item
-            print(f"  \033[33m{i}\033[0m) {cmd}")
             if desc:
-                print(f"  \033[35m↳ {desc}\033[0m")
+                print(f"  \033[33m{i}\033[0m) \033[35m{desc}\033[0m")
+                print(f"  \033[90m↳ {cmd}\033[0m")
+            else:
+                print(f"  \033[33m{i}\033[0m) {cmd}")
         else:
             print(f"  \033[33m{i}\033[0m) {item}")
     print()
