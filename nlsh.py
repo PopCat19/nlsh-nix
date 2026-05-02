@@ -75,6 +75,13 @@ def setup_api_key():
 
 def config_menu():
     """Interactive menu to set individual config options."""
+    # Save original values for cancel
+    original = {
+        'NLSH_BASE_URL': os.environ.get('NLSH_BASE_URL', ''),
+        'NLSH_MODEL': os.environ.get('NLSH_MODEL', ''),
+        'NLSH_API_KEY': os.environ.get('NLSH_API_KEY', ''),
+    }
+    
     while True:
         print("\033[36m!api menu\033[0m")
         print(f"  \033[33m1\033[0m Base URL: {os.environ.get('NLSH_BASE_URL', '(not set)')}")
@@ -82,7 +89,8 @@ def config_menu():
         api_key = os.environ.get('NLSH_API_KEY', '')
         masked = api_key[:8] + '...' + api_key[-4:] if len(api_key) > 12 else api_key or '(not set)'
         print(f"  \033[33m3\033[0m API key: {masked}")
-        print("  \033[33mq\033[0m Done")
+        print("  \033[33ms\033[0m Save & exit")
+        print("  \033[33mc\033[0m Cancel")
         print()
         
         choice = input("\033[33mSelect: \033[0m").strip().lower()
@@ -92,27 +100,33 @@ def config_menu():
             val = input(f"\033[33mBase URL [{current}]: \033[0m").strip()
             if val:
                 os.environ['NLSH_BASE_URL'] = val
-                save_config()
-                print("\033[32m✓ Saved\033[0m")
+                print("\033[36m(staged)\033[0m")
         elif choice == "2":
             current = os.environ.get('NLSH_MODEL', '')
             val = input(f"\033[33mModel [{current}]: \033[0m").strip()
             if val:
                 os.environ['NLSH_MODEL'] = val
-                save_config()
-                print("\033[32m✓ Saved\033[0m")
+                print("\033[36m(staged)\033[0m")
         elif choice == "3":
             val = input("\033[33mAPI key: \033[0m").strip()
             if val:
                 os.environ['NLSH_API_KEY'] = val
-                save_config()
-                print("\033[32m✓ Saved\033[0m")
+                print("\033[36m(staged)\033[0m")
             elif input("\033[33mClear API key? [y/N] \033[0m").strip().lower() == "y":
-                os.environ.pop('NLSH_API_KEY', None)
-                save_config()
-                print("\033[32m✓ Cleared\033[0m")
-        elif choice == "q":
-            print()
+                os.environ['NLSH_API_KEY'] = ''
+                print("\033[36m(staged - cleared)\033[0m")
+        elif choice == "s":
+            save_config()
+            print("\033[32m✓ Saved\033[0m\n")
+            break
+        elif choice == "c":
+            # Restore original values
+            for key, val in original.items():
+                if val:
+                    os.environ[key] = val
+                else:
+                    os.environ.pop(key, None)
+            print("\033[33m✗ Cancelled\033[0m\n")
             break
         else:
             print("\033[31mInvalid option\033[0m")
@@ -338,6 +352,7 @@ def main():
                     api_key=os.environ.get("NLSH_API_KEY", ""),
                     base_url=os.environ["NLSH_BASE_URL"],
                 )
+                continue
 
             if user_input == "!config":
                 show_config()
