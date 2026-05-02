@@ -17,16 +17,12 @@
           pkgs = pkgsFor system;
           python = pkgs.python312;
           pypkgs = python.pkgs;
-        in
-        {
-          default = pypkgs.buildPythonApplication {
-            pname = "nlsh-nix";
+          nlsh-pkg = pypkgs.buildPythonPackage {
+            pname = "nlsh";
             version = "0.1.0";
             pyproject = false;
 
             src = ./.;
-
-            propagatedBuildInputs = [ pypkgs.openai ];
 
             postPatch = ''
               substituteInPlace nlsh/__init__.py \
@@ -36,15 +32,15 @@
 
             installPhase = ''
               runHook preInstall
-              mkdir -p $out/bin
-              cat > $out/bin/nlsh << 'EOF'
-#!/bin/sh
-exec ${python}/bin/python -m nlsh "$@"
-EOF
-              chmod +x $out/bin/nlsh
+              mkdir -p $out/${python.sitePackages}/nlsh
+              cp nlsh/*.py $out/${python.sitePackages}/nlsh/
               runHook postInstall
             '';
-
+          };
+          python-with-nlsh = python.withPackages (ps: [ nlsh-pkg ps.openai ]);
+        in
+        {
+          default = pkgs.runCommand "nlsh-nix-0.1.0" {
             meta = {
               description = "Natural language shell (NixOS-compatible)";
               homepage = "https://github.com/PopCat19/nlsh-nix";
@@ -52,8 +48,16 @@ EOF
               mainProgram = "nlsh";
               platforms = supportedSystems;
             };
-          };
-      });
+          } ''
+            mkdir -p $out/bin
+            cat > $out/bin/nlsh << 'EOF'
+#!/bin/sh
+exec ${python-with-nlsh.interpreter} -m nlsh "$@"
+EOF
+            chmod +x $out/bin/nlsh
+          '';
+        }
+      );
 
       devShells = forAllSystems (system:
         let
