@@ -85,7 +85,7 @@
               pkgs.python312
               pkgs.python312Packages.openai
               pkgs.python312Packages.black
-              pkgs.nixfmt-rfc-style
+              pkgs.nixfmt
             ];
           };
         }
