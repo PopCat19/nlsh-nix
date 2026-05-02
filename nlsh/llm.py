@@ -135,10 +135,10 @@ Scout results:
 
 Rules:
 - Output exactly 3 commands, one per line, numbered 1-3
-- Include a brief description after // for each command
+- Include a very brief description after // (max 5 words)
 - Each command should be a different approach
 - No markdown, no backticks
-- Format: 1) <command> // <short description>
+- Format: 1) <command> // <5 word max>
 - Prefer simple, common commands
 
 User request: {user_input}"""
@@ -198,10 +198,10 @@ Recent command history:
 
 Rules:
 - Output exactly 3 commands, one per line, numbered 1-3
-- Include a brief description after // for each command
+- Include a very brief description after // (max 5 words)
 - Each command should be a different approach
 - No markdown, no backticks
-- Format: 1) <command> // <short description>
+- Format: 1) <command> // <5 word max>
 - Learn from previous attempts
 - Prefer simple, common commands
 
