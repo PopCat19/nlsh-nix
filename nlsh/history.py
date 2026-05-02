@@ -4,11 +4,34 @@
 #
 # This module:
 # - Tracks recent commands and their output
+# - Tracks regeneration attempts for current query
 # - Formats history for LLM context
 
 command_history = []
+regen_history = []  # [(attempt, command, clarification)]
 MAX_HISTORY = 10
 MAX_CONTEXT_CHARS = 4000
+
+def reset_regen_history():
+    regen_history.clear()
+
+def add_regen(command: str, clarification: str = ""):
+    regen_history.append({
+        "attempt": len(regen_history) + 1,
+        "command": command,
+        "clarification": clarification
+    })
+
+def format_regen_history() -> str:
+    if not regen_history:
+        return "No previous attempts."
+    
+    lines = []
+    for entry in regen_history:
+        lines.append(f"Attempt {entry['attempt']}: {entry['command']}")
+        if entry['clarification']:
+            lines.append(f"  Clarification: {entry['clarification']}")
+    return "\n".join(lines)
 
 def get_context_size() -> int:
     return sum(len(e["command"]) + len(e["output"]) for e in command_history)

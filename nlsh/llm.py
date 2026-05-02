@@ -11,7 +11,7 @@ import os
 import subprocess
 from openai import OpenAI
 from .ui import AwaitIndicator, TIMEOUT
-from .history import format_history
+from .history import format_history, format_regen_history
 
 _client = None
 _shell_context = None
@@ -72,8 +72,8 @@ def parse_clarify_response(text: str) -> tuple:
     for line in lines[1:]:
         line = line.strip()
         if line and len(line) > 2 and line[1] == ')':
-            key = line[0].lower()
-            if key.isalpha():
+            key = line[0]
+            if key.isdigit():
                 options[key] = line[3:].strip()
     
     return (question, options)
@@ -81,8 +81,10 @@ def parse_clarify_response(text: str) -> tuple:
 def get_command(user_input: str, cwd: str, clarification: str = "") -> tuple:
     history_context = format_history()
     shell_context = ensure_shell_context()
+    regen_context = format_regen_history()
     
     clarification_section = f"\n\nClarification: {clarification}" if clarification else ""
+    regen_section = f"\n\nPrevious attempts:\n{regen_context}" if regen_context != "No previous attempts." else ""
     
     prompt = f"""You are a shell command translator. Convert the user's request into a shell command.
 
@@ -90,16 +92,16 @@ def get_command(user_input: str, cwd: str, clarification: str = "") -> tuple:
 Current directory: {cwd}
 
 Recent command history:
-{history_context}
+{history_context}{regen_section}{clarification_section}
 
 Rules:
 - Output ONLY the command, nothing else
 - No explanations, no markdown, no backticks
-- If the request is ambiguous or vague, respond with: CLARIFY: <question>\n  a) <option a>\n  b) <option b>\n  ...\n  z) custom (describe what you want)
+- If the request is ambiguous or vague, respond with: CLARIFY: <question>\n  1) <option 1>\n  2) <option 2>\n  ...\n  0) custom (describe what you want)
+- Learn from previous attempts - if a similar command was rejected, try a different approach
 - Otherwise, make a reasonable assumption
 - Prefer simple, common commands
 - Prefer using available aliases/abbreviations when they match
-- Use the command history for context (e.g., "do that again", "delete the file I just created"){clarification_section}
 
 User request: {user_input}"""
 
