@@ -4,67 +4,58 @@ NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) wi
 
 ## Usage
 
-### Run directly
+Start nlsh, type natural language, get shell commands:
 
-```bash
-nix run github:PopCat19/nlsh-nix
+```
+15:41:22 ~
+❯ list all python files
+→ find . -name "*.py"
+./main.py
+./utils/helper.py
+
+15:41:36 ~/projects
+❯ commit with message fixed the bug
+→ git commit -m "fixed the bug"
+[main abc123] fixed the bug
+ 2 files changed, 5 insertions(+)
+
+15:41:41 ~/projects
+❯ find files larger than 100MB
+→ find . -size +100M
+./data/archive.tar.gz
 ```
 
-### Temporary shell
+### Commands
 
-```bash
-nix shell github:PopCat19/nlsh-nix
-nlsh
-```
+| Command | Description |
+|--------|-------------|
+| `!api` | Reconfigure API key/base URL/model |
+| `!config` | Show current configuration |
+| `!help` | Show available commands |
+| `!cmd <shell>` | Run shell command directly |
+| `Ctrl+D` | Exit |
 
-### Install to profile
+### Behavior
 
-```bash
-nix profile install github:PopCat19/nlsh-nix
-nlsh
-```
+- Type naturally → suggests a shell command
+- Press Enter to execute, type anything else to cancel
+- Shell commands (`ls`, `git`, `nix`, etc.) run directly without LLM
+- `cd` works natively for directory navigation
 
-### Update
+### First run
 
-```bash
-nix profile upgrade nlsh-nix
-```
+Prompts for:
 
-Or remove and reinstall:
-
-```bash
-nix profile remove nlsh-nix
-nix profile install github:PopCat19/nlsh-nix
-```
-
-### Remove
-
-```bash
-nix profile remove nlsh-nix
-rm -rf ~/.config/nlsh
-```
-
-### Flake inputs
-
-Add to your `flake.nix`:
-
-```nix
-{
-  inputs = {
-    nlsh-nix.url = "github:PopCat19/nlsh-nix";
-  };
-  outputs = { self, nlsh-nix, ... }: {
-    # Add to packages
-  };
-}
-```
+1. API key (press Enter to skip for local services)
+2. Base URL (e.g. `https://api.openai.com/v1`)
+3. Model name (e.g. `gpt-4.1-mini`, `llama3.2`)
 
 ## Configuration
 
 Config stored at `~/.config/nlsh/config`:
 
 | Variable | Required | Description |
-|----------|-----------|-------------|
+|----------|----------|-------------|
 | `NLSH_BASE_URL` | yes | API endpoint |
 | `NLSH_MODEL` | yes | Model to use |
 | `NLSH_API_KEY` | no | API key (skip for local services) |
@@ -101,14 +92,48 @@ export NLSH_BASE_URL=http://localhost:8000/v1
 export NLSH_MODEL=<model-name>
 ```
 
-## Commands
+## Nix
 
-| Command | Action |
-|---------|--------|
-| `!api` | Change API key/config |
-| `!config` | Show current config |
-| `!help` | Show help |
-| `!cmd` | Run shell command directly |
+### Run directly
+
+```bash
+nix run github:PopCat19/nlsh-nix
+```
+
+### Temporary shell
+
+```bash
+nix shell github:PopCat19/nlsh-nix
+nlsh
+```
+
+### Install to profile
+
+```bash
+nix profile add github:PopCat19/nlsh-nix
+nlsh
+```
+
+### Update
+
+```bash
+nix profile upgrade nlsh-nix
+```
+
+### Remove
+
+```bash
+nix profile remove nlsh-nix
+rm -rf ~/.config/nlsh
+```
+
+### Flake inputs
+
+```nix
+{
+  inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
+}
+```
 
 ## Differences from upstream
 
