@@ -179,16 +179,6 @@ def run_oneshot(args: str):
                 print("\033[31mtimed out\033[0m")
             except Exception as e:
                 print(f"\033[31merror: {e}\033[0m")
-            elif choice == '5':
-                new_req = input("\033[33mNew request: \033[0m").strip()
-                args = new_req
-                reset_regen_history()
-            else:
-                continue
-            result, _ = get_command(args, cwd, clarification)
-            command = result
-            add_regen(command, clarification)
-            regen_count += 1
         elif key == '\x1b':
             sys.exit(0)
         else:
