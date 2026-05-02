@@ -102,8 +102,9 @@ def is_configured():
 first_run = not is_configured()
 if first_run:
     setup_api_key()
-    print("\033[1mnlsh\033[0m - talk to your terminal\n")
-    show_help()
+
+print(f"\033[1mnlsh\033[0m - model: \033[36m{os.environ.get('NLSH_MODEL', 'unknown')}\033[0m\n")
+show_help()
 
 from openai import OpenAI
 
@@ -203,7 +204,7 @@ def main():
                 continue
 
             if user_input in ("!quit", "!q"):
-                print("\033[32mbye\033[0m")
+                print("\033[36mo7\033[0m")
                 sys.exit(0)
 
             if user_input == "!api":
@@ -260,7 +261,7 @@ def main():
                     add_to_history(command, result.stdout + result.stderr)
 
         except EOFError:
-            print("\n\033[32mbye\033[0m")
+            print("\n\033[36mo7\033[0m")
             sys.exit(0)
         except (InterruptedError, KeyboardInterrupt):
             continue
