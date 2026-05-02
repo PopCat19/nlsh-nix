@@ -4,12 +4,59 @@ NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) wi
 
 ## Usage
 
-```bash
-# Run directly (prompts for config on first run)
-nix run github:PopCat19/nlsh-nix
+### Run directly
 
-# Install to profile
+```bash
+nix run github:PopCat19/nlsh-nix
+```
+
+### Temporary shell
+
+```bash
+nix shell github:PopCat19/nlsh-nix
+nlsh
+```
+
+### Install to profile
+
+```bash
 nix profile install github:PopCat19/nlsh-nix
+nlsh
+```
+
+### Update
+
+```bash
+nix profile upgrade nlsh-nix
+```
+
+Or remove and reinstall:
+
+```bash
+nix profile remove nlsh-nix
+nix profile install github:PopCat19/nlsh-nix
+```
+
+### Remove
+
+```bash
+nix profile remove nlsh-nix
+rm -rf ~/.config/nlsh
+```
+
+### Flake inputs
+
+Add to your `flake.nix`:
+
+```nix
+{
+  inputs = {
+    nlsh-nix.url = "github:PopCat19/nlsh-nix";
+  };
+  outputs = { self, nlsh-nix, ... }: {
+    # Add to packages
+  };
+}
 ```
 
 ## Configuration
