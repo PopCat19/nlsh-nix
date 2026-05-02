@@ -157,7 +157,7 @@ Output only the scout commands, nothing else:"""
             try:
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
                 elapsed = int(time.time() - start)
-                print(f"  {i}. $ {cmd} \033[32m{elapsed}s\033[0m")
+                print(f"  {i}. $ {cmd}")
                 output = (result.stdout + result.stderr)
                 if output.strip():
                     print(f"  \033[36m[output]\033[0m")
