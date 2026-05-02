@@ -259,7 +259,10 @@ def main():
                         print(result.stderr, end="")
                     add_to_history(command, result.stdout + result.stderr)
 
-        except (EOFError, InterruptedError, KeyboardInterrupt):
+        except EOFError:
+            print("\n\033[32mbye\033[0m")
+            sys.exit(0)
+        except (InterruptedError, KeyboardInterrupt):
             continue
         except Exception as e:
             err = str(e)
