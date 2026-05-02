@@ -12,6 +12,8 @@ import subprocess
 import readline
 import tty
 import termios
+import threading
+import time
 
 def exit_handler(sig, frame):
     print()
@@ -74,6 +76,8 @@ def setup_api_key():
     save_config()
     print("\033[32m✓ Config saved!\033[0m\n")
 
+TIMEOUT = 30
+
 def get_single_key():
     """Read a single keypress without requiring Enter."""
     fd = sys.stdin.fileno()
@@ -87,6 +91,37 @@ def get_single_key():
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
+
+class AwaitIndicator:
+    """Show elapsed time while awaiting response."""
+    def __init__(self, timeout: int = TIMEOUT):
+        self.timeout = timeout
+        self.start_time = None
+        self.stop_event = None
+        self.thread = None
+
+    def __enter__(self):
+        self.start_time = time.time()
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._tick)
+        self.thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self.stop_event.set()
+        self.thread.join()
+        # Clear the line
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+
+    def _tick(self):
+        while not self.stop_event.is_set():
+            elapsed = int(time.time() - self.start_time)
+            sys.stdout.write(f"\r\033[33m[awaiting response] ({elapsed}/{self.timeout})\033[0m")
+            sys.stdout.flush()
+            time.sleep(0.1)
+            if elapsed >= self.timeout:
+                break
 
 def show_help():
     print("\033[36m!api\033[0m       - Change API key/config")
@@ -179,12 +214,13 @@ Rules:
 User request: {user_input}"""
 
     try:
-        response = client.chat.completions.create(
-            model=os.environ["NLSH_MODEL"],
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=256,
-            timeout=30.0,
-        )
+        with AwaitIndicator():
+            response = client.chat.completions.create(
+                model=os.environ["NLSH_MODEL"],
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=256,
+                timeout=TIMEOUT,
+            )
         return response.choices[0].message.content.strip()
     except Exception as e:
         if "timeout" in str(e).lower() or "timed out" in str(e).lower():
