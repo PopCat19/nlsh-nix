@@ -29,7 +29,7 @@
             propagatedBuildInputs = [ pypkgs.openai ];
 
             postPatch = ''
-              substituteInPlace nlsh.py \
+              substituteInPlace nlsh/__init__.py \
                 --replace-fail '@VERSION@' '${self.shortRev or "dirty"}' \
                 --replace-fail '@DATE@' '${self.lastModifiedDate}'
             '';
@@ -37,7 +37,10 @@
             installPhase = ''
               runHook preInstall
               mkdir -p $out/bin
-              cp nlsh.py $out/bin/nlsh
+              cat > $out/bin/nlsh << 'EOF'
+#!/bin/sh
+exec ${python}/bin/python -m nlsh "$@"
+EOF
               chmod +x $out/bin/nlsh
               runHook postInstall
             '';
