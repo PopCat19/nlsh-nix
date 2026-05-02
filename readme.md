@@ -1,6 +1,6 @@
 # nlsh-nix
 
-NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) with OpenAI-compatible API support.
+NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmoud/nlsh) with OpenAI-compatible API support.
 
 ## Usage
 
@@ -8,29 +8,78 @@ NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) wi
 
 ```bash
 nlsh list all python files
-[awaiting API response...] (1s/30s)
-→ find . -name "*.py"
-[Enter=run r=regen a=ask Esc=cancel]
+nlsh c2d2b91 (20260502) - model: ministral-3:8b
+
+Generated commands:
+  1) Find Python files recursively
+  ↳ find . -name "*.py"
+  2) Use fd for faster search
+  ↳ fd -e py
+  3) Basic recursive grep
+  ↳ ls -R | grep ".py"
+
+[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
 ```
 
-Press `Enter` to run, `r` to regenerate, `a` to ask for changes, `Esc` to cancel.
+Press `Enter` for option 1, `2-3` to select, `s` to scout first, `r` to regenerate, `a` to ask for changes, `Esc` to cancel.
 
 ### REPL mode
 
 ```bash
 nlsh
-nlsh 7abc282 (20260502) - model: ministral-3:8b
-
-!api       - Change API key/config
-!config   - Show current config
-!help      - Show this help
-!cmd <cmd>  - Run shell command directly
-!quit, !q   - Exit
+nlsh c2d2b91 (20260502) - model: ministral-3:8b
 
 popcat19 > nixos rebuild
-[awaiting API response...] (2s/30s)
-→ nixos-rebuild switch
-[Enter=run r=regen a=ask Esc=cancel]
+
+Generated commands:
+  1) Switch to new configuration
+  ↳ sudo nixos-rebuild switch
+  2) Build and test without switching
+  ↳ sudo nixos-rebuild build
+  3) Dry run to see changes
+  ↳ sudo nixos-rebuild dry-build
+
+[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
+```
+
+### Scout mode
+
+Press `s` to let the model explore your environment first:
+
+```
+[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
+s
+Scouting...
+  $ ls -la
+  $ find . -maxdepth 2 -type f
+  $ du -sh *
+
+Generated commands:
+  1) Find largest files
+  ↳ find . -type f -exec du -h {} + | sort -rh | head
+  ...
+```
+
+Scout runs exploratory commands (no sudo) to gather context before proposing.
+
+### Confirmation
+
+After selecting a command, you see a confirmation prompt:
+
+```
+↳ sudo nixos-rebuild switch
+[Enter=run c=copy Esc=cancel]
+```
+
+- `Enter` - Run the command
+- `c` - Copy to clipboard (wl-copy/xclip/xsel)
+- `Esc` - Cancel
+
+For sudo commands, a warning is shown:
+
+```
+⚠ sudo: sudo nixos-rebuild switch
+[Enter=run c=copy Esc=cancel]
 ```
 
 ### Ask menu
@@ -38,9 +87,6 @@ popcat19 > nixos rebuild
 Press `a` to request changes:
 
 ```
-→ nixos-rebuild switch
-[Enter=run r=regen a=ask Esc=cancel]
-a
 What do you want?
   1) Clarify the request
   2) A different command
@@ -51,58 +97,13 @@ What do you want?
   Esc) Cancel
 ```
 
-Press `Esc` to cancel without changes.
+### Running indicator
 
-### Model-initiated clarification
-
-If your request is vague, the model may ask for clarification:
+Commands show elapsed time while running:
 
 ```
-popcat19 > delete the file
-[awaiting API response...] (1s/30s)
-Which file do you want to delete?
-  1) config.json
-  2) *.log files
-  3) Everything in ./tmp
-  0) Custom (describe what you want)
-
-Select 1-0, or type answer: 1
-[awaiting API response...] (1s/30s)
-→ rm config.json
-[Enter=run r=regen a=ask Esc=cancel]
+[running] (3s)
 ```
-
-### Commands
-
-| Command | Description |
-|--------|-------------|
-| `!api` | Interactive menu for API config |
-| `!config` | Show current configuration |
-| `!help` | Show available commands |
-| `!cmd <shell>` | Run shell command directly |
-| `!quit`, `!q` | Exit |
-| `Ctrl+D` | Exit |
-
-### Confirmation keys
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Run the suggested command |
-| `r` | Regenerate suggestion (model sees history) |
-| `a` | Ask menu for changes |
-| `Esc` | Cancel |
-
-The `(regen N)` counter shows regeneration attempts.
-
-### Behavior
-
-- Type naturally → suggets a shell command
-- Commands run through `$SHELL` (aliases and functions work)
-- Shell commands (`ls`, `git`, `nix`, etc.) run directly without LLM
-- `cd` works natively for directory navigation
-- Shell context (aliases/fish abbr) included in prompts
-- Model sees previous regeneration attempts
-- 30s timeout with progress indicator
 
 ### First run
 
@@ -197,12 +198,17 @@ rm -rf ~/.config/nlsh
 - Modular codebase (config, history, llm, ui, main)
 - Config at `~/.config/nlsh/config` (XDG-friendly)
 - One-shot mode with command-line args
+- Multiple command proposals (3 options) with descriptions
+- Scout mode - model explores environment before proposing
 - Commands run through `$SHELL` (aliases/functions work)
 - Shell context (aliases/fish abbr) included in prompts
-- Single-key confirmation (Enter/r/a/Esc)
+- Confirmation before running with copy option
+- Sudo detection with warning
+- Running indicator with elapsed time
 - Ask menu with numbered options (1-0)
 - Model-initiated clarification with choices
 - Regen history visible to model for learning
-- Timeout indicator with progress
+- 30s timeout with progress indicator
 - Interactive `!api` menu with cancel
 - Native ESC/backspace handling in inputs
+- Version format: yyyymmdd-<rev>
