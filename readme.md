@@ -10,16 +10,16 @@ NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) wi
 nlsh list all python files
 [awaiting API response...] (1s/30s)
 → find . -name "*.py"
-[Enter=run r=regen Esc=cancel]
+[Enter=run r=regen c=clarify Esc=cancel]
 ```
 
-Press `Enter` to run, `r` to regenerate, `Esc` to cancel.
+Press `Enter` to run, `r` to regenerate, `c` to clarify, `Esc` to cancel.
 
 ### REPL mode
 
 ```bash
 nlsh
-nlsh 3544591 (20260502) - model: gemma4:31b
+nlsh e005ac3 (20260502) - model: ministral-3:8b
 
 !api       - Change API key/config
 !config   - Show current config
@@ -27,10 +27,24 @@ nlsh 3544591 (20260502) - model: gemma4:31b
 !cmd <cmd>  - Run shell command directly
 !quit, !q   - Exit
 
-popcat19 > list all python files
+popcat19 > nixos rebuild
+[awaiting API response...] (2s/30s)
+→ nixos-rebuild switch
+[Enter=run r=regen c=clarify Esc=cancel]
+```
+
+### Clarifying suggestions
+
+When the suggestion isn't quite right, press `c` to provide guidance:
+
+```
+→ nix-env -f /nix/store/... rebuild switch
+[Enter=run r=regen c=clarify Esc=cancel]
+c
+Clarify: use home-manager
 [awaiting API response...] (1s/30s)
-→ find . -name "*.py"
-[Enter=run r=regen Esc=cancel] _
+→ home-manager switch
+[Enter=run r=regen c=clarify Esc=cancel] (regen 1)
 ```
 
 ### Commands
@@ -50,7 +64,10 @@ popcat19 > list all python files
 |-----|--------|
 | `Enter` | Run the suggested command |
 | `r` | Regenerate suggestion |
+| `c` | Clarify with comment and regenerate |
 | `Esc` | Cancel (back to prompt) |
+
+The `(regen N)` counter shows how many times you've regenerated.
 
 ### Behavior
 
@@ -154,6 +171,8 @@ rm -rf ~/.config/nlsh
 - Config at `~/.config/nlsh/config` (XDG-friendly)
 - One-shot mode with command-line args
 - Shell context (aliases/fish abbr) included in prompts
-- Single-key confirmation (Enter/r/Esc)
+- Single-key confirmation (Enter/r/c/Esc)
+- Clarify mode for guided regeneration
+- Regen counter to track iterations
 - Timeout indicator with progress
 - Interactive `!api` menu with cancel option
