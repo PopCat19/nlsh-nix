@@ -20,7 +20,7 @@ signal.signal(signal.SIGINT, exit_handler)
 CONFIG_DIR = os.path.expanduser("~/.config/nlsh")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config")
 
-REQUIRED_KEYS = ["NLSH_API_KEY", "NLSH_BASE_URL", "NLSH_MODEL"]
+REQUIRED_KEYS = ["NLSH_BASE_URL", "NLSH_MODEL"]
 
 _loaded_from_config = set()
 
@@ -40,18 +40,15 @@ def save_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         f.write("# nlsh configuration\n")
+        f.write(f"NLSH_API_KEY={os.environ.get('NLSH_API_KEY', '')}\n")
         for key in REQUIRED_KEYS:
-            val = os.environ.get(key, "")
-            f.write(f"{key}={val}\n")
+            f.write(f"{key}={os.environ.get(key, '')}\n")
 
 def setup_api_key():
     print(f"\n\033[36mOpenAI-compatible API setup\033[0m\n")
 
-    if not os.environ.get("NLSH_API_KEY"):
-        api_key = input("\033[33mAPI key: \033[0m").strip()
-        if not api_key:
-            print("API key required.")
-            sys.exit(1)
+    api_key = input("\033[33mAPI key (enter to skip): \033[0m").strip()
+    if api_key:
         os.environ["NLSH_API_KEY"] = api_key
 
     if not os.environ.get("NLSH_BASE_URL"):
@@ -82,6 +79,10 @@ def is_configured():
     return all(os.environ.get(k) for k in REQUIRED_KEYS)
 
 def show_config():
+    api_key = os.environ.get("NLSH_API_KEY", "")
+    masked = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "(not set)" if not api_key else api_key
+    source = "env" if "NLSH_API_KEY" not in _loaded_from_config else "config"
+    print(f"\033[36mNLSH_API_KEY:\033[0m {masked} [{source}]")
     for key in REQUIRED_KEYS:
         val = os.environ.get(key, "(not set)")
         source = "env" if key not in _loaded_from_config else "config"
@@ -102,7 +103,7 @@ if first_run:
 from openai import OpenAI
 
 client = OpenAI(
-    api_key=os.environ["NLSH_API_KEY"],
+    api_key=os.environ.get("NLSH_API_KEY", ""),
     base_url=os.environ["NLSH_BASE_URL"],
 )
 
@@ -200,7 +201,7 @@ def main():
                 setup_api_key()
                 global client
                 client = OpenAI(
-                    api_key=os.environ["NLSH_API_KEY"],
+                    api_key=os.environ.get("NLSH_API_KEY", ""),
                     base_url=os.environ["NLSH_BASE_URL"],
                 )
                 continue

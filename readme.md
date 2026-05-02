@@ -16,11 +16,11 @@ nix profile install github:PopCat19/nlsh-nix
 
 Config stored at `~/.config/nlsh/config`:
 
-| Variable | Description |
-|----------|-------------|
-| `NLSH_API_KEY` | Your API key |
-| `NLSH_BASE_URL` | API endpoint |
-| `NLSH_MODEL` | Model to use |
+| Variable | Required | Description |
+|----------|-----------|-------------|
+| `NLSH_BASE_URL` | yes | API endpoint |
+| `NLSH_MODEL` | yes | Model to use |
+| `NLSH_API_KEY` | no | API key (skip for local services) |
 
 **Env vars take precedence over config file.** Set values in your shell to skip prompts or override:
 
@@ -43,7 +43,6 @@ export NLSH_MODEL=<model-name>
 **Ollama:**
 
 ```bash
-export NLSH_API_KEY=ollama
 export NLSH_BASE_URL=http://localhost:11434/v1
 export NLSH_MODEL=<model-name>
 ```
