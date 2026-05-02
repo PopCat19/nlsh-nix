@@ -61,6 +61,7 @@ def show_ask_options():
     print("  \033[33m4\033[0m) Safer/alternative approach")
     print("  \033[33m5\033[0m) Something completely different")
     print("  \033[33m0\033[0m) Custom description")
+    print("  \033[33mEsc\033[0m) Cancel")
     print()
 
 def run_oneshot(args: str):
@@ -102,8 +103,10 @@ def run_oneshot(args: str):
             regen_count += 1
         elif key == 'a':
             show_ask_options()
-            choice = input("\033[33mSelect: \033[0m").strip()
-            if choice == '0':
+            choice = get_single_key()
+            if choice == '\x1b':  # ESC - cancel
+                continue
+            elif choice == '0':
                 custom = input("\033[33mDescribe: \033[0m").strip()
                 clarification = f"{clarification} {custom}".strip() if clarification else custom
             elif choice == '1':
@@ -120,6 +123,8 @@ def run_oneshot(args: str):
                 new_req = input("\033[33mNew request: \033[0m").strip()
                 args = new_req
                 reset_regen_history()
+            else:
+                continue
             result, _ = get_command(args, cwd, clarification)
             command = result
             add_regen(command, clarification)
@@ -243,8 +248,10 @@ def run_repl():
                         print(f"\033[31merror: {e}\033[0m")
                 elif key == 'a':
                     show_ask_options()
-                    choice = input("\033[33mSelect: \033[0m").strip()
-                    if choice == '0':
+                    choice = get_single_key()
+                    if choice == '\x1b':  # ESC - cancel
+                        continue
+                    elif choice == '0':
                         custom = input("\033[33mDescribe: \033[0m").strip()
                         clarification = f"{clarification} {custom}".strip() if clarification else custom
                     elif choice == '1':
@@ -261,6 +268,8 @@ def run_repl():
                         new_req = input("\033[33mNew request: \033[0m").strip()
                         user_input = new_req
                         reset_regen_history()
+                    else:
+                        continue
                     try:
                         result, _ = get_command(user_input, cwd, clarification)
                         command = result
