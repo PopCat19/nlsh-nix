@@ -132,26 +132,27 @@ Output only the scout commands, nothing else:"""
         
         # Ask for approval
         print(f"  {i}. $ {cmd}")
-        print(f"  \033[36m[Enter=run s=skip Esc=cancel]\033[0m")
+        print(f"  [Enter=run s=skip Esc=cancel]", end='')
         key = get_single_key()
+        print()  # Newline after input
         
         if key == '\x1b':  # Esc - cancel scout
             print("\033[33mScout cancelled\033[0m")
             break
         elif key == 's' or key == 'S':  # Skip
-            print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
+            print(f"  \033[90m[skipped]\033[0m")
             continue
         elif key == '\r' or key == '\n':  # Run
             try:
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
                 status = "\033[32m✓\033[0m" if result.returncode == 0 else f"\033[31m✗ ({result.returncode})\033[0m"
-                print(f"  {i}. $ {cmd} {status}")
+                print(f"  \033[90m{status}\033[0m")
                 output = (result.stdout + result.stderr)
                 scout_results.append(f"$ {cmd}\n{output[:500]}")
             except subprocess.TimeoutExpired:
-                print(f"  {i}. $ {cmd} \033[31m✗ (timeout)\033[0m")
+                print(f"  \033[31m✗ (timeout)\033[0m")
         else:
-            print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
+            print(f"  \033[90m[skipped]\033[0m")
             continue
     
     # Step 3: Generate commands with scout context
