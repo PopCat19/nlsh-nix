@@ -13,6 +13,11 @@ import subprocess
 import threading
 import time
 
+try:
+    import readline
+except ImportError:
+    pass
+
 from .config import load_config, is_configured, setup_api_key, config_menu, is_loaded_from_config
 from .llm import init_client, reinit_client, get_command, get_commands, scout_and_get_commands
 from .history import add_to_history, reset_regen_history, add_regen
@@ -103,18 +108,24 @@ def confirm_run(cmd: str) -> bool:
     
     key = get_single_key()
     if key == 'c':
-        # Try wl-copy first (Wayland), then xclip (X11)
         import shutil
-        if shutil.which('wl-copy'):
-            os.system(f"echo '{cmd}' | wl-copy")
-            print("\033[32m✓ copied to clipboard\033[0m")
-        elif shutil.which('xclip'):
-            os.system(f"echo '{cmd}' | xclip -selection clipboard")
-            print("\033[32m✓ copied to clipboard\033[0m")
-        elif shutil.which('xsel'):
-            os.system(f"echo '{cmd}' | xsel --clipboard --input")
-            print("\033[32m✓ copied to clipboard\033[0m")
-        else:
+        copied = False
+        for tool in ['wl-copy', 'xclip', 'xsel']:
+            if shutil.which(tool):
+                args = []
+                if tool == 'xclip':
+                    args = ['-selection', 'clipboard']
+                elif tool == 'xsel':
+                    args = ['--clipboard', '--input']
+                try:
+                    p = subprocess.run([tool] + args, input=cmd, text=True, capture_output=True)
+                    if p.returncode == 0:
+                        print("\033[32m✓ copied to clipboard\033[0m")
+                        copied = True
+                        break
+                except Exception:
+                    continue
+        if not copied:
             print("\033[31mno clipboard tool found (wl-copy/xclip/xsel)\033[0m")
         return False
     return key == '\r' or key == '\n'
@@ -255,6 +266,9 @@ def run_repl():
 
             if not user_input:
                 continue
+
+            if 'readline' in sys.modules:
+                readline.add_history(user_input)
 
             if user_input.startswith("cd "):
                 path = os.path.expanduser(user_input[3:].strip())

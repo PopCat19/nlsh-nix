@@ -24,44 +24,87 @@ def get_single_key():
         tty.setraw(sys.stdin.fileno())
         ch = sys.stdin.read(1)
         if ch == '\x1b':
-            if select.select([sys.stdin], [], [], 0.1)[0]:
-                ch += sys.stdin.read(2)
+            while select.select([sys.stdin], [], [], 0.05)[0]:
+                ch += sys.stdin.read(1)
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
 
 def raw_input(prompt: str) -> str:
-    """Read line with ESC=cancel, Backspace=delete, Enter=submit."""
     sys.stdout.write(prompt)
     sys.stdout.flush()
-    
+
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     buffer = []
-    
+    pos = 0
+
+    def redraw():
+        sys.stdout.write('\r' + prompt + ''.join(buffer))
+        sys.stdout.write('\r' + prompt + ''.join(buffer[:pos]))
+        sys.stdout.flush()
+
+    def delete_word_backward():
+        nonlocal pos
+        while pos > 0 and buffer[pos - 1] == ' ':
+            pos -= 1
+            buffer.pop(pos)
+        while pos > 0 and buffer[pos - 1] != ' ':
+            pos -= 1
+            buffer.pop(pos)
+
     try:
         tty.setraw(fd)
         while True:
             ch = sys.stdin.read(1)
-            
-            if ch == '\x1b':  # ESC
-                print()
-                return ""
-            elif ch == '\r' or ch == '\n':  # Enter
+
+            if ch == '\x1b':
+                while select.select([sys.stdin], [], [], 0.03)[0]:
+                    ch += sys.stdin.read(1)
+                seq = ch
+                if seq == '\x1b':
+                    print()
+                    return ""
+                elif seq in ('\x1b[C', '\x1bOC'):  # Right
+                    if pos < len(buffer):
+                        pos += 1
+                        redraw()
+                elif seq in ('\x1b[D', '\x1bOD'):  # Left
+                    if pos > 0:
+                        pos -= 1
+                        redraw()
+                elif seq in ('\x1b[H', '\x1b[1~', '\x1bOH'):  # Home
+                    pos = 0
+                    redraw()
+                elif seq in ('\x1b[F', '\x1b[4~', '\x1bOF'):  # End
+                    pos = len(buffer)
+                    redraw()
+                elif seq == '\x1b[3~':  # Delete
+                    if pos < len(buffer):
+                        buffer.pop(pos)
+                        redraw()
+            elif ch == '\r' or ch == '\n':
                 print()
                 return ''.join(buffer)
-            elif ch == '\x7f' or ch == '\x08':  # Backspace
-                if buffer:
-                    buffer.pop()
-                    sys.stdout.write('\b \b')
-                    sys.stdout.flush()
-            elif ch == '\x03':  # Ctrl+C
+            elif ch == '\x7f' or ch == '\x08':
+                if pos > 0:
+                    pos -= 1
+                    buffer.pop(pos)
+                    redraw()
+            elif ch == '\x17':  # Ctrl+W
+                delete_word_backward()
+                redraw()
+            elif ch == '\x15':  # Ctrl+U
+                buffer = buffer[pos:]
+                pos = 0
+                redraw()
+            elif ch == '\x03':
                 print()
                 return ""
             elif ch.isprintable():
-                buffer.append(ch)
-                sys.stdout.write(ch)
-                sys.stdout.flush()
+                buffer.insert(pos, ch)
+                pos += 1
+                redraw()
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
@@ -95,6 +138,7 @@ class AwaitIndicator:
                 break
 
 def show_help():
+    print("\033[36mType plain English to generate shell commands\033[0m")
     print("\033[36m!api\033[0m       - Change API key/config")
     print("\033[36m!config\033[0m   - Show current config")
     print("\033[36m!help\033[0m      - Show this help")

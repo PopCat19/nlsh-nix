@@ -12,10 +12,9 @@ import time
 import subprocess
 import threading
 
-from .ui import get_single_key, AwaitIndicator
-import subprocess
 from openai import OpenAI
-from .ui import AwaitIndicator, TIMEOUT
+
+from .ui import get_single_key, AwaitIndicator, TIMEOUT
 from .history import format_history, format_regen_history
 
 _client = None
@@ -392,7 +391,6 @@ User request: {user_input}"""
             clarify_text = result[clarify_idx + 8:].strip()
             question, options = parse_clarify_response(clarify_text)
             return (None, (question, options))
-        return (result, None)
         return (result, None)
     except Exception as e:
         if "timeout" in str(e).lower() or "timed out" in str(e).lower():
