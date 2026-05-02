@@ -119,10 +119,21 @@ def confirm_run(cmd: str) -> bool:
         return False
     return key == '\r' or key == '\n'
 
+def get_cmd(item):
+    """Extract command from tuple or string."""
+    return item[0] if isinstance(item, tuple) else item
+
 def show_gen_options(commands: list):
     print("\033[36mGenerated commands:\033[0m")
-    for i, cmd in enumerate(commands, 1):
-        print(f"  \033[33m{i}\033[0m) {cmd}")
+    for i, item in enumerate(commands, 1):
+        if isinstance(item, tuple):
+            cmd, desc = item
+            if desc:
+                print(f"  \033[33m{i}\033[0m) {cmd}  \033[90m# {desc}\033[0m")
+            else:
+                print(f"  \033[33m{i}\033[0m) {cmd}")
+        else:
+            print(f"  \033[33m{i}\033[0m) {item}")
     print()
 
 def run_oneshot(args: str):
@@ -138,7 +149,7 @@ def run_oneshot(args: str):
         print(f"\033[31merror: {e}\033[0m")
         sys.exit(1)
     
-    command = commands[0]  # Default to first
+    command = get_cmd(commands[0])  # Default to first
     add_regen(command)
     
     regen_count = 0
@@ -151,22 +162,22 @@ def run_oneshot(args: str):
         key = get_single_key()
         
         if key == '\r' or key == '\n' or key == '1':
-            if confirm_run(commands[0]):
-                run_cmd(commands[0])
+            if confirm_run(get_cmd(commands[0])):
+                run_cmd(get_cmd(commands[0]))
             sys.exit(0)
         elif key == '2':
-            if confirm_run(commands[1]):
-                run_cmd(commands[1])
+            if confirm_run(get_cmd(commands[1])):
+                run_cmd(get_cmd(commands[1]))
             sys.exit(0)
         elif key == '3':
-            if confirm_run(commands[2]):
-                run_cmd(commands[2])
+            if confirm_run(get_cmd(commands[2])):
+                run_cmd(get_cmd(commands[2]))
             sys.exit(0)
         elif key == 's':
             try:
                 print()
                 commands = scout_and_get_commands(args, cwd)
-                command = commands[0]
+                command = get_cmd(commands[0])
                 clarification = ""
                 regen_count = 0
             except TimeoutError:
@@ -176,7 +187,7 @@ def run_oneshot(args: str):
         elif key == 'r':
             try:
                 commands = get_commands(args, cwd, clarification)
-                command = commands[0]
+                command = get_cmd(commands[0])
                 add_regen(command, clarification)
                 regen_count += 1
             except TimeoutError:
@@ -222,7 +233,7 @@ def run_oneshot(args: str):
                 continue
             try:
                 commands = get_commands(args, cwd, clarification)
-                command = commands[0]
+                command = get_cmd(commands[0])
                 add_regen(command, clarification)
                 regen_count += 1
             except TimeoutError:
