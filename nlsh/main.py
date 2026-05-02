@@ -129,7 +129,7 @@ def show_gen_options(commands: list):
         if isinstance(item, tuple):
             cmd, desc = item
             if desc:
-                print(f"  \033[33m{i}\033[0m) \033[35m{desc}\033[0m")
+                print(f"  \033[33m{i}\033[0m) \033[90m{desc}\033[0m")
                 print(f"  ↳ {cmd}")
             else:
                 print(f"  \033[33m{i}\033[0m) {cmd}")
