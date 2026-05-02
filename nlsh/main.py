@@ -12,8 +12,6 @@ import sys
 import subprocess
 import threading
 import time
-import shutil
-import tempfile
 
 try:
     import readline
@@ -24,64 +22,11 @@ from .config import Config, setup_wizard, config_menu
 from .history import HistoryStore
 from .llm import init_client, reinit_client, get_command, get_commands, get_shell_history, scout_and_get_commands
 from .ui import get_single_key, raw_input, show_help, show_config, show_gen_options, show_ask_options, prompt_clarify, show_history_approval
+from .util import copy_to_clipboard, clipboard_read, edit_in_editor
 from .types import Command
 
 
 # --- Command Execution ---
-
-def copy_to_clipboard(text: str) -> bool:
-    for tool in ["wl-copy", "xclip", "xsel"]:
-        if shutil.which(tool):
-            args = []
-            if tool == "xclip":
-                args = ["-selection", "clipboard"]
-            elif tool == "xsel":
-                args = ["--clipboard", "--input"]
-            try:
-                p = subprocess.run(
-                    [tool] + args, input=text, text=True, capture_output=True,
-                )
-                if p.returncode == 0:
-                    return True
-            except Exception:
-                continue
-    return False
-
-
-def clipboard_read() -> str:
-    for tool in ["wl-paste", "xclip", "xsel"]:
-        if shutil.which(tool):
-            args = []
-            if tool == "xclip":
-                args = ["-selection", "clipboard", "-o"]
-            elif tool == "xsel":
-                args = ["--clipboard", "--output"]
-            try:
-                result = subprocess.run(
-                    [tool] + args, capture_output=True, text=True,
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
-            except Exception:
-                continue
-    return ""
-
-
-def edit_in_editor(text: str) -> str:
-    editor_cmd = os.environ.get("EDITOR", "nano")
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False,
-    ) as f:
-        f.write(text)
-        tmp = f.name
-    try:
-        subprocess.run([editor_cmd, tmp])
-        with open(tmp) as f:
-            return f.read().strip()
-    except Exception:
-        return ""
-    finally:
-        os.unlink(tmp)
 
 def run_cmd(cmd, store):
     print(f"\033[36m[running] (0s)\033[0m", end="\r")

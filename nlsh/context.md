@@ -6,5 +6,6 @@
 # - `config.py` — config loading, saving, and management, defines Config dataclass with load/save, provides setup wizard and interactive config menu
 # - `history.py` — command history management, provides HistoryStore class for tracking commands and regens, formats history for LLM context
 # - `ui.py` — terminal UI components and user interaction, handles keypress reading, masked input, line editing, display functions, clarification prompts
-# - `main.py` — entry point and main application loop, handles one-shot and REPL modes, clipboard utilities, command execution
+# - `util.py` — shared utilities for clipboard integration and external editor support
+# - `main.py` — entry point and main application loop, handles one-shot and REPL modes, command execution
 # - `llm/` — LLM subpackage for prompt templates, API client, response parsing, shell introspection, tool definitions, command generation, and scouting
