@@ -29,9 +29,9 @@ def parse_multi_commands(text):
             rest = line[2:].strip()
             if "//" in rest:
                 cmd, desc = rest.split("//", 1)
-                commands.append(Command(cmd=cmd.strip(), desc=desc.strip()))
+                commands.append(Command(cmd=clean_cmd(cmd), desc=desc.strip()))
             else:
-                commands.append(Command(cmd=rest.strip()))
+                commands.append(Command(cmd=clean_cmd(rest)))
     return commands
 
 
