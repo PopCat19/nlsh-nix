@@ -8,6 +8,10 @@
 # - Gathers shell context (aliases, abbreviations)
 
 import os
+import time
+import subprocess
+
+from .ui import get_single_key, AwaitIndicator
 import subprocess
 from openai import OpenAI
 from .ui import AwaitIndicator, TIMEOUT
@@ -114,14 +118,40 @@ Output only the scout commands, nothing else:"""
     except:
         scout_cmds = ['ls -la', 'pwd']
     
-    # Step 2: Run scout commands
+    # Step 2: Run scout commands with approval
     print(f"\033[36mScouting...\033[0m")
     scout_results = []
-    for cmd in scout_cmds:
-        print(f"  \033[33m$ {cmd}\033[0m")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
-        output = (result.stdout + result.stderr)[:500]  # Truncate
-        scout_results.append(f"$ {cmd}\n{output}")
+    safe_cmds = ['ls', 'cat', 'which', 'pwd', 'grep', 'head', 'tail', 'find .', 'du']
+    
+    for i, cmd in enumerate(scout_cmds, 1):
+        # Block slow/dangerous patterns
+        if any(x in cmd for x in ['find /', 'rm', 'dd', 'mkfs', 'sudo', '>']):
+            print(f"  {i}. $ {cmd} \033[31m[blocked]\033[0m")
+            continue
+        
+        # Ask for approval
+        print(f"  {i}. $ {cmd} \033[36m[Enter=run s=skip Esc=cancel scout]\033[0m")
+        key = get_single_key()
+        
+        if key == '\x1b':  # Esc - cancel scout
+            print("\033[33mScout cancelled\033[0m")
+            break
+        elif key == 's' or key == 'S':  # Skip
+            print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
+            continue
+        elif key == '\r' or key == '\n':  # Run
+            start = time.time()
+            try:
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                elapsed = int(time.time() - start)
+                print(f"  {i}. $ {cmd} \033[32m({elapsed}s/10s)\033[0m")
+                output = (result.stdout + result.stderr)[:500]
+                scout_results.append(f"$ {cmd}\n{output}")
+            except subprocess.TimeoutExpired:
+                print(f"  {i}. $ {cmd} \033[31m[timeout]\033[0m")
+        else:
+            print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
+            continue
     
     # Step 3: Generate commands with scout context
     scout_context = "\n\n".join(scout_results)
