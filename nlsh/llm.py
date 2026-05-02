@@ -132,7 +132,7 @@ Output only the scout commands, nothing else:"""
         
         # Ask for approval
         print(f"  {i}. $ {cmd}")
-        print(f"  [Enter=run s=skip Esc=cancel]", end='')
+        print(f"  [Enter=run s=skip Esc=cancel]", end='', flush=True)
         key = get_single_key()
         print()  # Newline after input
         
