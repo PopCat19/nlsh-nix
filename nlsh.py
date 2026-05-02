@@ -346,6 +346,9 @@ def main():
         command = get_command(args, cwd)
         regen_count = 0
         
+        regen_count = 0
+        clarification = ""
+        
         while True:
             print(f"\033[33m→ {command}\033[0m")
             regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
@@ -359,14 +362,12 @@ def main():
                     print(result.stderr, end="")
                 sys.exit(0)
             elif key == 'r':
-                command = get_command(args, cwd)
+                command = get_command(args, cwd, clarification)
                 regen_count += 1
             elif key == 'c':
-                # Restore terminal for input
                 clarification = input("\033[33mClarify: \033[0m").strip()
-                if clarification:
-                    command = get_command(args, cwd, clarification)
-                    regen_count += 1
+                command = get_command(args, cwd, clarification)
+                regen_count += 1
             elif key == '\x1b':  # ESC
                 sys.exit(0)
             else:
@@ -442,6 +443,7 @@ def main():
                 continue
 
             regen_count = 0
+            clarification = ""
             while True:
                 print(f"\033[33m→ {command}\033[0m")
                 regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
@@ -465,7 +467,7 @@ def main():
                     break
                 elif key == 'r':
                     try:
-                        command = get_command(user_input, cwd)
+                        command = get_command(user_input, cwd, clarification)
                         regen_count += 1
                     except TimeoutError:
                         print("\033[31mtimed out - press r to retry\033[0m")
@@ -473,14 +475,13 @@ def main():
                         print(f"\033[31merror: {e}\033[0m")
                 elif key == 'c':
                     clarification = input("\033[33mClarify: \033[0m").strip()
-                    if clarification:
-                        try:
-                            command = get_command(user_input, cwd, clarification)
-                            regen_count += 1
-                        except TimeoutError:
-                            print("\033[31mtimed out\033[0m")
-                        except Exception as e:
-                            print(f"\033[31merror: {e}\033[0m")
+                    try:
+                        command = get_command(user_input, cwd, clarification)
+                        regen_count += 1
+                    except TimeoutError:
+                        print("\033[31mtimed out\033[0m")
+                    except Exception as e:
+                        print(f"\033[31merror: {e}\033[0m")
                 elif key == '\x1b':  # ESC
                     print()  # Newline for clean exit
                     break
