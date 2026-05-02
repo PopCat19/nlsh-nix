@@ -70,9 +70,13 @@ Current directory: {cwd}
 
 Rules:
 - Output ONLY the commands to run, one per line
-- NO sudo allowed - skip if needed
+- Scouts MUST be purely observational / readonly
+- Never change files, permissions, processes, or system state
+- NO sudo allowed
 - Keep it minimal (2-5 commands max)
-- Common scouts: ls, cat, which, find, grep
+- Safe scouts: ls, cat, head, tail, file, stat, which, find (not /), grep, rg,
+  ps, df, du, free, echo, git log, git status, git diff, systemctl status,
+  journalctl, nix eval, nix flake show, curl/wget to stdout
 
 Request: {user_input}
 
@@ -85,13 +89,49 @@ Current directory: {cwd}{reject_section}
 
 Rules:
 - Output ONLY the command, nothing else
+- Scout MUST be purely observational / readonly
+- Never change files, permissions, processes, or system state
 - NO sudo allowed
 - Keep it minimal and fast
-- Common scouts: ls, cat, which, find (not root), grep, head, du
+- Safe scouts: ls, cat, head, tail, file, stat, which, find (not /), grep, rg,
+  ps, df, du, free, echo, git log, git diff, systemctl status, journalctl
 
 Request: {user_input}
 
 Output only the single scout command:"""
+
+SCOUT_BLOCKED = [
+    "rm ", "mv ", "touch ", "mkdir ", "rmdir ",
+    "chmod ", "chown ", "chgrp ",
+    "dd ", "mkfs",
+    "kill ", "pkill", "killall",
+    "reboot", "shutdown", "poweroff", "halt",
+    "mount ", "umount",
+    "systemctl start", "systemctl stop", "systemctl restart",
+    "systemctl enable", "systemctl disable",
+    "systemctl mask", "systemctl unmask",
+    "sudo",
+    " > ", " >> ",
+    "| tee ",
+    "git commit", "git push", "git add ", "git rm ",
+    "git checkout ", "git merge", "git rebase",
+    "git reset ",
+    "nixos-rebuild switch", "nixos-rebuild boot",
+    "nix build ", "nix shell ", "nix run ",
+    "nix develop", "nix profile install",
+    "ln -",
+    "pip install", "pip uninstall",
+    "npm install -g", "cargo install",
+    "make install",
+    "cp ", "scp ",
+]
+
+
+def _is_blocked_scout(cmd):
+    for p in SCOUT_BLOCKED:
+        if cmd.startswith(p) or f" {p}" in cmd:
+            return True
+    return False
 
 # --- Client ---
 
@@ -440,10 +480,9 @@ def scout_and_get_commands(user_input, cwd, store):
 
     # Step 2: Run scouts with approval
     scout_results = []
-    blocked = {"find / ", " rm ", " dd ", "mkfs", "sudo", " > "}
 
     for i, cmd in enumerate(scout_cmds, 1):
-        if cmd.startswith("rm ") or any(p in cmd for p in blocked):
+        if _is_blocked_scout(cmd):
             print(f"  {i}. ⚙ bash $ {cmd} \033[31m[blocked]\033[0m")
             continue
 
