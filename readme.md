@@ -25,31 +25,34 @@ Config stored at `~/.config/nlsh/config`:
 **Env vars take precedence over config file.** Set values in your shell to skip prompts or override:
 
 ```bash
-export NLSH_API_KEY=sk-...
-export NLSH_BASE_URL=https://api.openai.com/v1
-export NLSH_MODEL=gpt-4.1-mini
+export NLSH_API_KEY=<api-key>
+export NLSH_BASE_URL=<base-url>
+export NLSH_MODEL=<model>
 ```
 
 ### Examples
 
 **OpenAI:**
-```
-NLSH_API_KEY=sk-...
-NLSH_BASE_URL=https://api.openai.com/v1
-NLSH_MODEL=gpt-4.1-mini
+
+```bash
+export NLSH_API_KEY=<your-key>
+export NLSH_BASE_URL=https://api.openai.com/v1
+export NLSH_MODEL=gpt-4.1-mini
 ```
 
 **Ollama:**
-```
-NLSH_API_KEY=ollama
-NLSH_BASE_URL=http://localhost:11434/v1
-NLSH_MODEL=llama3.2
+
+```bash
+export NLSH_API_KEY=ollama
+export NLSH_BASE_URL=http://localhost:11434/v1
+export NLSH_MODEL=<model-name>
 ```
 
-**vLLM / LM Studio / etc:**
-```
-NLSH_BASE_URL=http://localhost:8000/v1
-NLSH_MODEL=<your-model>
+**vLLM / LM Studio:**
+
+```bash
+export NLSH_BASE_URL=http://localhost:8000/v1
+export NLSH_MODEL=<model-name>
 ```
 
 ## Commands
