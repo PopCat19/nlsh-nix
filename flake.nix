@@ -26,7 +26,7 @@
 
           src = ./.;
 
-          propagatedBuildInputs = [ pypkgs.google-genai ];
+          propagatedBuildInputs = [ pypkgs.openai ];
 
           installPhase = ''
             runHook preInstall
@@ -52,7 +52,7 @@
         in
         {
           default = pkgs.mkShell {
-            packages = [ pkgs.python312 pkgs.python312Packages.google-genai ];
+            packages = [ pkgs.python312 pkgs.python312Packages.openai ];
           };
         }
       );

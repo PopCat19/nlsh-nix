@@ -4,7 +4,7 @@
 # Purpose: Natural language shell interface
 #
 # This module:
-# - Translates plain English to shell commands via Gemini API
+# - Translates plain English to shell commands via OpenAI-compatible API
 import signal
 import os
 import sys
@@ -17,50 +17,87 @@ def exit_handler(sig, frame):
 
 signal.signal(signal.SIGINT, exit_handler)
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-env_path = os.path.join(script_dir, ".env")
+CONFIG_DIR = os.path.expanduser("~/.config/nlsh")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config")
 
-def load_env():
-    if os.path.exists(env_path):
-        with open(env_path) as f:
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-4.1-mini"
+DEFAULTS = {
+    "NLSH_API_KEY": "",
+    "NLSH_BASE_URL": DEFAULT_BASE_URL,
+    "NLSH_MODEL": DEFAULT_MODEL,
+}
+
+def load_config():
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH) as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     key, value = line.split("=", 1)
-                    os.environ[key] = value
+                    os.environ.setdefault(key, value)
+    for key, value in DEFAULTS.items():
+        os.environ.setdefault(key, value)
 
-def save_api_key(api_key: str):
-    with open(env_path, "w") as f:
-        f.write(f"GEMINI_API_KEY={api_key}\n")
+def save_config():
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(CONFIG_PATH, "w") as f:
+        f.write("# nlsh configuration\n")
+        for key in DEFAULTS:
+            val = os.environ.get(key, "")
+            f.write(f"{key}={val}\n")
 
 def setup_api_key():
-    print(f"\n\033[36mGet your free key at: https://aistudio.google.com/apikey\033[0m\n")
-    api_key = input("\033[33mEnter your Gemini API key:\033[0m ").strip()
+    print(f"\n\033[36mOpenAI-compatible API setup\033[0m")
+    print(f"Defaults: base_url={DEFAULT_BASE_URL}, model={DEFAULT_MODEL}\n")
+
+    api_key = input("\033[33mAPI key: \033[0m").strip()
     if not api_key:
-        print("No API key provided.")
+        print("API key required.")
         sys.exit(1)
-    save_api_key(api_key)
-    os.environ["GEMINI_API_KEY"] = api_key
-    print("\033[32m✓ API key saved!\033[0m\n")
+    os.environ["NLSH_API_KEY"] = api_key
+
+    base_url = input(f"\033[33mBase URL [{os.environ.get('NLSH_BASE_URL', DEFAULT_BASE_URL)}]: \033[0m").strip()
+    if base_url:
+        os.environ["NLSH_BASE_URL"] = base_url
+
+    model = input(f"\033[33mModel [{os.environ.get('NLSH_MODEL', DEFAULT_MODEL)}]: \033[0m").strip()
+    if model:
+        os.environ["NLSH_MODEL"] = model
+
+    save_config()
+    print("\033[32m✓ Config saved!\033[0m\n")
 
 def show_help():
-    print("\033[36m!api\033[0m       - Change API key")
-    print("\033[36m!uninstall\033[0m - Remove nlsh")
+    print("\033[36m!api\033[0m       - Change API key/config")
+    print("\033[36m!config\033[0m   - Show current config")
     print("\033[36m!help\033[0m      - Show this help")
     print("\033[36m!cmd\033[0m       - Run cmd directly")
     print()
 
-load_env()
+def show_config():
+    print(f"\033[36mBase URL:\033[0m {os.environ.get('NLSH_BASE_URL', DEFAULT_BASE_URL)}")
+    print(f"\033[36mModel:\033[0m    {os.environ.get('NLSH_MODEL', DEFAULT_MODEL)}")
+    key = os.environ.get("NLSH_API_KEY", "")
+    masked = key[:8] + "..." + key[-4:] if len(key) > 12 else "(not set)"
+    print(f"\033[36mAPI Key:\033[0m  {masked}")
+    print()
 
-first_run = not os.getenv("GEMINI_API_KEY")
+load_config()
+
+first_run = not os.environ.get("NLSH_API_KEY")
 if first_run:
     setup_api_key()
     print("\033[1mnlsh\033[0m - talk to your terminal\n")
     show_help()
 
-from google import genai
+from openai import OpenAI
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = OpenAI(
+    api_key=os.environ.get("NLSH_API_KEY"),
+    base_url=os.environ.get("NLSH_BASE_URL", DEFAULT_BASE_URL),
+)
 
 command_history = []
 MAX_HISTORY = 10
@@ -82,7 +119,7 @@ def add_to_history(command: str, output: str = ""):
 def format_history() -> str:
     if not command_history:
         return "No previous commands."
-    
+
     lines = []
     for i, entry in enumerate(command_history[-5:], 1):
         lines.append(f"{i}. $ {entry['command']}")
@@ -94,7 +131,7 @@ def format_history() -> str:
 
 def get_command(user_input: str, cwd: str) -> str:
     history_context = format_history()
-    prompt = f"""You are a shell command translator. Convert the user's request into a shell command for macOS/zsh.
+    prompt = f"""You are a shell command translator. Convert the user's request into a shell command for Linux/bash.
 Current directory: {cwd}
 
 Recent command history:
@@ -109,23 +146,24 @@ Rules:
 
 User request: {user_input}"""
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
+    response = client.chat.completions.create(
+        model=os.environ.get("NLSH_MODEL", DEFAULT_MODEL),
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=256,
     )
-    return response.text.strip()
+    return response.choices[0].message.content.strip()
 
 def is_natural_language(text: str) -> bool:
     if text.startswith("!"):
         return False
-    shell_commands = ["ls", "pwd", "clear", "exit", "quit", "whoami", "date", "cal", 
+    shell_commands = ["ls", "pwd", "clear", "exit", "quit", "whoami", "date", "cal",
                       "top", "htop", "history", "which", "man", "touch", "head", "tail",
                       "grep", "find", "sort", "wc", "diff", "tar", "zip", "unzip"]
-    shell_starters = ["cd ", "ls ", "echo ", "cat ", "mkdir ", "rm ", "cp ", "mv ", 
-                      "git ", "npm ", "node ", "npx ", "python", "pip ", "brew ", "curl ", 
-                      "wget ", "chmod ", "chown ", "sudo ", "vi ", "vim ", "nano ", "code ", 
+    shell_starters = ["cd ", "ls ", "echo ", "cat ", "mkdir ", "rm ", "cp ", "mv ",
+                      "git ", "npm ", "node ", "npx ", "python", "pip ", "brew ", "curl ",
+                      "wget ", "chmod ", "chown ", "sudo ", "vi ", "vim ", "nano ", "code ",
                       "open ", "export ", "source ", "docker ", "kubectl ", "aws ", "gcloud ",
-                      "./", "/", "~", "$", ">", ">>", "|", "&&"]
+                      "nix ", "nixos-", "home-manager ", "./", "/", "~", "$", ">", ">>", "|", "&&"]
     if text in shell_commands:
         return False
     return not any(text.startswith(s) for s in shell_starters)
@@ -136,10 +174,10 @@ def main():
             cwd = os.getcwd()
             prompt = f"\033[32m{os.path.basename(cwd)}\033[0m > "
             user_input = input(prompt).strip()
-            
+
             if not user_input:
                 continue
-            
+
             if user_input.startswith("cd "):
                 path = os.path.expanduser(user_input[3:].strip())
                 try:
@@ -150,31 +188,24 @@ def main():
             elif user_input == "cd":
                 os.chdir(os.path.expanduser("~"))
                 continue
-            
+
             if user_input == "!api":
                 setup_api_key()
                 global client
-                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+                client = OpenAI(
+                    api_key=os.environ.get("NLSH_API_KEY"),
+                    base_url=os.environ.get("NLSH_BASE_URL", DEFAULT_BASE_URL),
+                )
                 continue
-            
-            if user_input == "!uninstall":
-                confirm = input("\033[33mRemove nlsh? [y/N]\033[0m ")
-                if confirm.lower() == "y":
-                    import shutil
-                    install_dir = os.path.expanduser("~/.nlsh")
-                    bin_path = os.path.expanduser("~/.local/bin/nlsh")
-                    if os.path.exists(install_dir):
-                        shutil.rmtree(install_dir)
-                    if os.path.exists(bin_path):
-                        os.remove(bin_path)
-                    print("\033[32m✓ nlsh uninstalled\033[0m")
-                    sys.exit(0)
+
+            if user_input == "!config":
+                show_config()
                 continue
-            
+
             if user_input == "!help":
                 show_help()
                 continue
-            
+
             if user_input.startswith("!"):
                 cmd = user_input[1:]
                 if not cmd:
@@ -185,7 +216,7 @@ def main():
                     print(result.stderr, end="")
                 add_to_history(cmd, result.stdout + result.stderr)
                 continue
-            
+
             if not is_natural_language(user_input):
                 result = subprocess.run(user_input, shell=True, capture_output=True, text=True)
                 print(result.stdout, end="")
@@ -193,10 +224,10 @@ def main():
                     print(result.stderr, end="")
                 add_to_history(user_input, result.stdout + result.stderr)
                 continue
-            
+
             command = get_command(user_input, cwd)
             confirm = input(f"\033[33m→ {command}\033[0m [Enter] ")
-            
+
             if confirm == "":
                 if command.startswith("cd "):
                     path = os.path.expanduser(command[3:].strip())
@@ -210,7 +241,7 @@ def main():
                     if result.stderr:
                         print(result.stderr, end="")
                     add_to_history(command, result.stdout + result.stderr)
-            
+
         except (EOFError, InterruptedError, KeyboardInterrupt):
             continue
         except Exception as e:
