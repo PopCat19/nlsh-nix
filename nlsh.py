@@ -49,32 +49,73 @@ def save_config():
             f.write(f"{key}={os.environ.get(key, '')}\n")
 
 def setup_api_key():
-    print(f"\n\033[36mOpenAI-compatible API setup\033[0m")
-    if is_configured():
-        print("\033[33mConfig already set. Press Enter to keep current values.\033[0m\n")
-    else:
-        print()
+    """First-run setup - requires base URL and model."""
+    print(f"\n\033[36mOpenAI-compatible API setup\033[0m\n")
+
+    while not os.environ.get("NLSH_BASE_URL"):
+        base_url = input("\033[33mBase URL: \033[0m").strip()
+        if base_url:
+            os.environ["NLSH_BASE_URL"] = base_url
+        else:
+            print("Base URL required.")
+
+    while not os.environ.get("NLSH_MODEL"):
+        model = input("\033[33mModel: \033[0m").strip()
+        if model:
+            os.environ["NLSH_MODEL"] = model
+        else:
+            print("Model required.")
 
     api_key = input("\033[33mAPI key (enter to skip): \033[0m").strip()
     if api_key:
         os.environ["NLSH_API_KEY"] = api_key
 
-    base_url = input(f"\033[33mBase URL [{os.environ.get('NLSH_BASE_URL', '')}]: \033[0m").strip()
-    if base_url:
-        os.environ["NLSH_BASE_URL"] = base_url
-    elif not os.environ.get("NLSH_BASE_URL"):
-        print("Base URL required.")
-        sys.exit(1)
-
-    model = input(f"\033[33mModel [{os.environ.get('NLSH_MODEL', '')}]: \033[0m").strip()
-    if model:
-        os.environ["NLSH_MODEL"] = model
-    elif not os.environ.get("NLSH_MODEL"):
-        print("Model required.")
-        sys.exit(1)
-
     save_config()
     print("\033[32m✓ Config saved!\033[0m\n")
+
+def config_menu():
+    """Interactive menu to set individual config options."""
+    while True:
+        print("\033[36m!api menu\033[0m")
+        print(f"  \033[33m1\033[0m Base URL: {os.environ.get('NLSH_BASE_URL', '(not set)')}")
+        print(f"  \033[33m2\033[0m Model: {os.environ.get('NLSH_MODEL', '(not set)')}")
+        api_key = os.environ.get('NLSH_API_KEY', '')
+        masked = api_key[:8] + '...' + api_key[-4:] if len(api_key) > 12 else api_key or '(not set)'
+        print(f"  \033[33m3\033[0m API key: {masked}")
+        print("  \033[33mq\033[0m Done")
+        print()
+        
+        choice = input("\033[33mSelect: \033[0m").strip().lower()
+        
+        if choice == "1":
+            current = os.environ.get('NLSH_BASE_URL', '')
+            val = input(f"\033[33mBase URL [{current}]: \033[0m").strip()
+            if val:
+                os.environ['NLSH_BASE_URL'] = val
+                save_config()
+                print("\033[32m✓ Saved\033[0m")
+        elif choice == "2":
+            current = os.environ.get('NLSH_MODEL', '')
+            val = input(f"\033[33mModel [{current}]: \033[0m").strip()
+            if val:
+                os.environ['NLSH_MODEL'] = val
+                save_config()
+                print("\033[32m✓ Saved\033[0m")
+        elif choice == "3":
+            val = input("\033[33mAPI key: \033[0m").strip()
+            if val:
+                os.environ['NLSH_API_KEY'] = val
+                save_config()
+                print("\033[32m✓ Saved\033[0m")
+            elif input("\033[33mClear API key? [y/N] \033[0m").strip().lower() == "y":
+                os.environ.pop('NLSH_API_KEY', None)
+                save_config()
+                print("\033[32m✓ Cleared\033[0m")
+        elif choice == "q":
+            print()
+            break
+        else:
+            print("\033[31mInvalid option\033[0m")
 
 TIMEOUT = 30
 
@@ -291,13 +332,12 @@ def main():
                 sys.exit(0)
 
             if user_input == "!api":
-                setup_api_key()
+                config_menu()
                 global client
                 client = OpenAI(
                     api_key=os.environ.get("NLSH_API_KEY", ""),
                     base_url=os.environ["NLSH_BASE_URL"],
                 )
-                continue
 
             if user_input == "!config":
                 show_config()
