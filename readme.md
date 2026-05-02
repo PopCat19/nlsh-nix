@@ -118,7 +118,7 @@ nlsh
 ### Update
 
 ```bash
-nix profile upgrade nlsh-nix
+nix profile upgrade nlsh-nix --refresh
 ```
 
 ### Remove
