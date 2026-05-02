@@ -402,7 +402,10 @@ def run_repl(store, config):
                 show_help()
                 continue
             elif user_input.startswith("!"):
-                cmd = user_input[1:]
+                if user_input.startswith("!cmd "):
+                    cmd = user_input[5:]
+                else:
+                    cmd = user_input[1:]
                 if not cmd:
                     continue
                 if confirm_run(cmd):
