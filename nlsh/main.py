@@ -20,7 +20,7 @@ except ImportError:
 
 from .config import Config, setup_wizard, config_menu
 from .history import HistoryStore
-from .llm import init_client, reinit_client, get_command, get_commands, scout_and_get_commands
+from .llm import init_client, reinit_client, get_command, get_commands, get_shell_history, scout_and_get_commands
 from .ui import get_single_key, raw_input, show_help, show_config, show_gen_options, show_ask_options, prompt_clarify
 from .types import Command
 
@@ -180,7 +180,7 @@ def _command_selection(
         show_gen_options(commands)
         regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
         print(
-            f"\033[36m[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]"
+            f"\033[36m[Enter=1 2-3=select s=scout r=regen a=ask h=hist Esc=cancel]"
             f"{regen_str}\033[0m"
         )
         key = get_single_key()
@@ -236,6 +236,24 @@ def _command_selection(
                 continue
             try:
                 commands = get_commands(user_input, cwd, store, clarification)
+                store.add_regen(commands[0].cmd, clarification)
+                regen_count += 1
+            except TimeoutError:
+                print("\033[31mtimed out\033[0m")
+            except Exception as e:
+                print(f"\033[31merror: {e}\033[0m")
+
+        elif key == "h":
+            term_hist = get_shell_history()
+            if not term_hist:
+                print("\033[90m(no shell history found)\033[0m")
+                continue
+            count = term_hist.count("\n") + 1
+            print(f"\033[36msharing last {count} shell history entries...\033[0m")
+            try:
+                commands = get_commands(
+                    user_input, cwd, store, clarification, term_hist,
+                )
                 store.add_regen(commands[0].cmd, clarification)
                 regen_count += 1
             except TimeoutError:

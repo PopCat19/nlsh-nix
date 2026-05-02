@@ -27,7 +27,7 @@ PROMPT_SINGLE = """You are a shell command translator. Convert the user's reques
 Current directory: {cwd}
 
 Recent command history:
-{history}{regen_section}{clarification_section}
+{history}{regen_section}{clarification_section}{terminal_history}
 
 Rules:
 - Output ONLY the command, nothing else
@@ -50,7 +50,7 @@ PROMPT_MULTI = """You are a shell command translator. Generate exactly 3 differe
 Current directory: {cwd}
 
 Recent command history:
-{history}{regen_section}{clarification_section}
+{history}{regen_section}{clarification_section}{terminal_history}
 
 Rules:
 - Output exactly 3 commands, one per line, numbered 1-3
@@ -206,10 +206,51 @@ def ensure_shell_context():
     return _shell_context
 
 
+def get_shell_history(n=50, max_line=200):
+    shell = os.environ.get("SHELL", "/bin/bash")
+
+    if "fish" in shell:
+        hist_file = os.path.expanduser("~/.local/share/fish/fish_history")
+    elif "zsh" in shell:
+        hist_file = os.path.expanduser("~/.zsh_history")
+    else:
+        hist_file = os.path.expanduser("~/.bash_history")
+
+    if not os.path.exists(hist_file):
+        return ""
+
+    try:
+        with open(hist_file, "r", errors="replace") as f:
+            raw = f.readlines()[-n:]
+
+        history = []
+        for line in raw:
+            line = line.strip()
+            if not line:
+                continue
+
+            if "fish" in shell:
+                if line.startswith("- cmd: "):
+                    cmd = line[7:]
+                    history.append(cmd[:max_line] if len(cmd) > max_line else cmd)
+            elif "zsh" in shell:
+                if line.startswith(": "):
+                    parts = line.split(";", 1)
+                    if len(parts) > 1:
+                        cmd = parts[1]
+                        history.append(cmd[:max_line] if len(cmd) > max_line else cmd)
+            else:
+                history.append(line[:max_line] if len(line) > max_line else line)
+
+        return "\n".join(f"  $ {cmd}" for cmd in history)
+    except Exception:
+        return ""
+
+
 # --- Command Generation ---
 
-def _build_sections(clarification, store):
-    """Build shared prompt sections from clarification and history."""
+def _build_sections(clarification, store, terminal_history=""):
+    """Build shared prompt sections from clarification, history, and terminal context."""
     clarification_section = (
         f"\n\nClarification: {clarification}" if clarification else ""
     )
@@ -219,13 +260,18 @@ def _build_sections(clarification, store):
         if regen != "No previous attempts."
         else ""
     )
-    return clarification_section, regen_section
+    th_sec = (
+        f"\n\nRecent terminal activity:\n{terminal_history}"
+        if terminal_history
+        else ""
+    )
+    return clarification_section, regen_section, th_sec
 
 
-def get_command(user_input, cwd, store, clarification=""):
+def get_command(user_input, cwd, store, clarification="", terminal_history=""):
     history = store.format_history()
     shell_ctx = ensure_shell_context()
-    cs, rs = _build_sections(clarification, store)
+    cs, rs, th = _build_sections(clarification, store, terminal_history)
 
     prompt = PROMPT_SINGLE.format(
         shell_context=shell_ctx,
@@ -233,6 +279,7 @@ def get_command(user_input, cwd, store, clarification=""):
         history=history,
         regen_section=rs,
         clarification_section=cs,
+        terminal_history=th,
         user_input=user_input,
     )
 
@@ -250,10 +297,10 @@ def get_command(user_input, cwd, store, clarification=""):
         raise
 
 
-def get_commands(user_input, cwd, store, clarification=""):
+def get_commands(user_input, cwd, store, clarification="", terminal_history=""):
     history = store.format_history()
     shell_ctx = ensure_shell_context()
-    cs, rs = _build_sections(clarification, store)
+    cs, rs, th = _build_sections(clarification, store, terminal_history)
 
     prompt = PROMPT_MULTI.format(
         shell_context=shell_ctx,
@@ -261,6 +308,7 @@ def get_commands(user_input, cwd, store, clarification=""):
         history=history,
         regen_section=rs,
         clarification_section=cs,
+        terminal_history=th,
         user_input=user_input,
     )
 
