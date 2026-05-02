@@ -123,7 +123,6 @@ def show_gen_options(commands: list):
     print("\033[36mGenerated commands:\033[0m")
     for i, cmd in enumerate(commands, 1):
         print(f"  \033[33m{i}\033[0m) {cmd}")
-    print("  \033[33mEnter\033[0m = 1  \033[33ms\033[0m = scout first")
     print()
 
 def run_oneshot(args: str):
@@ -148,7 +147,7 @@ def run_oneshot(args: str):
     while True:
         show_gen_options(commands)
         regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-        print(f"\033[36m[Enter=1 2-3=select r=regen a=ask Esc=cancel]{regen_str}\033[0m")
+        print(f"\033[36m[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]{regen_str}\033[0m")
         key = get_single_key()
         
         if key == '\r' or key == '\n' or key == '1':
