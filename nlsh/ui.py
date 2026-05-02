@@ -254,3 +254,33 @@ def prompt_clarify(clarify):
             return custom
         return clarify.options[answer]
     return answer
+
+
+def show_history_approval(history):
+    lines = history.split("\n")
+    preview_n = 12
+    if len(lines) > preview_n + 3:
+        preview = lines[:preview_n]
+        preview.append(
+            f"\033[90m  ... and {len(lines) - preview_n} more lines\033[0m"
+        )
+    else:
+        preview = lines
+
+    print("\033[36mShell history preview:\033[0m")
+    print("\033[90m" + "\n".join(preview) + "\033[0m")
+    print()
+    print(
+        "\033[36m[Enter=send e=edit c=copy p=paste Esc=cancel]\033[0m"
+    )
+
+    key = get_single_key()
+    if key in ("\r", "\n"):
+        return "send"
+    elif key == "e":
+        return "e"
+    elif key == "c":
+        return "c"
+    elif key == "p":
+        return "p"
+    return "esc"

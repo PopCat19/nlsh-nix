@@ -12,6 +12,8 @@ import sys
 import subprocess
 import threading
 import time
+import shutil
+import tempfile
 
 try:
     import readline
@@ -21,11 +23,65 @@ except ImportError:
 from .config import Config, setup_wizard, config_menu
 from .history import HistoryStore
 from .llm import init_client, reinit_client, get_command, get_commands, get_shell_history, scout_and_get_commands
-from .ui import get_single_key, raw_input, show_help, show_config, show_gen_options, show_ask_options, prompt_clarify
+from .ui import get_single_key, raw_input, show_help, show_config, show_gen_options, show_ask_options, prompt_clarify, show_history_approval
 from .types import Command
 
 
 # --- Command Execution ---
+
+def copy_to_clipboard(text: str) -> bool:
+    for tool in ["wl-copy", "xclip", "xsel"]:
+        if shutil.which(tool):
+            args = []
+            if tool == "xclip":
+                args = ["-selection", "clipboard"]
+            elif tool == "xsel":
+                args = ["--clipboard", "--input"]
+            try:
+                p = subprocess.run(
+                    [tool] + args, input=text, text=True, capture_output=True,
+                )
+                if p.returncode == 0:
+                    return True
+            except Exception:
+                continue
+    return False
+
+
+def clipboard_read() -> str:
+    for tool in ["wl-paste", "xclip", "xsel"]:
+        if shutil.which(tool):
+            args = []
+            if tool == "xclip":
+                args = ["-selection", "clipboard", "-o"]
+            elif tool == "xsel":
+                args = ["--clipboard", "--output"]
+            try:
+                result = subprocess.run(
+                    [tool] + args, capture_output=True, text=True,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip()
+            except Exception:
+                continue
+    return ""
+
+
+def edit_in_editor(text: str) -> str:
+    editor_cmd = os.environ.get("EDITOR", "nano")
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False,
+    ) as f:
+        f.write(text)
+        tmp = f.name
+    try:
+        subprocess.run([editor_cmd, tmp])
+        with open(tmp) as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+    finally:
+        os.unlink(tmp)
 
 def run_cmd(cmd, store):
     print(f"\033[36m[running] (0s)\033[0m", end="\r")
@@ -99,27 +155,11 @@ def confirm_run(cmd: str) -> bool:
 
     key = get_single_key()
     if key == "c":
-        import shutil
-        copied = False
-        for tool in ["wl-copy", "xclip", "xsel"]:
-            if shutil.which(tool):
-                args = []
-                if tool == "xclip":
-                    args = ["-selection", "clipboard"]
-                elif tool == "xsel":
-                    args = ["--clipboard", "--input"]
-                try:
-                    p = subprocess.run(
-                        [tool] + args, input=cmd, text=True, capture_output=True,
-                    )
-                    if p.returncode == 0:
-                        print("\033[32m✓ copied to clipboard\033[0m")
-                        copied = True
-                        break
-                except Exception:
-                    continue
-        if not copied:
+        if copy_to_clipboard(cmd):
+            print("\033[32m✓ copied to clipboard\033[0m")
+        else:
             print("\033[31mno clipboard tool found (wl-copy/xclip/xsel)\033[0m")
+        return False
         return False
     return key in ("\r", "\n")
 
@@ -248,18 +288,49 @@ def _command_selection(
             if not term_hist:
                 print("\033[90m(no shell history found)\033[0m")
                 continue
-            count = term_hist.count("\n") + 1
-            print(f"\033[36msharing last {count} shell history entries...\033[0m")
-            try:
-                commands = get_commands(
-                    user_input, cwd, store, clarification, term_hist,
-                )
-                store.add_regen(commands[0].cmd, clarification)
-                regen_count += 1
-            except TimeoutError:
-                print("\033[31mtimed out\033[0m")
-            except Exception as e:
-                print(f"\033[31merror: {e}\033[0m")
+
+            while True:
+                action = show_history_approval(term_hist)
+
+                if action == "esc":
+                    break
+                elif action == "e":
+                    edited = edit_in_editor(term_hist)
+                    if edited:
+                        term_hist = edited
+                    else:
+                        print("\033[31meditor returned empty, cancelled\033[0m")
+                        break
+                elif action == "c":
+                    if copy_to_clipboard(term_hist):
+                        print("\033[32m✓ copied to clipboard\033[0m")
+                    else:
+                        print("\033[31mno clipboard tool\033[0m")
+                elif action == "p":
+                    from_clip = clipboard_read()
+                    if from_clip:
+                        term_hist = from_clip
+                        print("\033[36m(pasted from clipboard)\033[0m")
+                    else:
+                        print("\033[90mclipboard empty\033[0m")
+                elif action == "send":
+                    count = term_hist.count("\n") + 1
+                    print(
+                        f"\033[36msharing {count} history entries...\033[0m"
+                    )
+                    try:
+                        commands = get_commands(
+                            user_input, cwd, store, clarification, term_hist,
+                        )
+                        store.add_regen(commands[0].cmd, clarification)
+                        regen_count += 1
+                    except TimeoutError:
+                        print("\033[31mtimed out\033[0m")
+                    except Exception as e:
+                        print(f"\033[31merror: {e}\033[0m")
+                    break
+
+            continue
 
         elif key == "\x1b":
             return
