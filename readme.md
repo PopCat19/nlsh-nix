@@ -2,52 +2,89 @@
 
 NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmoud/nlsh) with OpenAI-compatible API support.
 
-## Usage
+<details open>
+<summary>Usage</summary>
 
-### One-shot mode
+#### One-shot
 
 ```bash
 nlsh list all python files
-nlsh c2d2b91 (20260502) - model: ministral-3:8b
+```
+
+```
+nlsh fc5434b (20260502) - model: ministral-3:8b
 
 Generated commands:
   1) Find Python files recursively
   ↳ find . -name "*.py"
   2) Use fd for faster search
   ↳ fd -e py
-  3) Basic recursive grep
-  ↳ ls -R | grep ".py"
 
 [Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
 ```
 
-Press `Enter` for option 1, `2-3` to select, `s` to scout first, `r` to regenerate, `a` to ask for changes, `Esc` to cancel.
-
-### REPL mode
+#### REPL
 
 ```bash
 nlsh
-nlsh c2d2b91 (20260502) - model: ministral-3:8b
+```
 
+```
 popcat19 > nixos rebuild
 
 Generated commands:
   1) Switch to new configuration
   ↳ sudo nixos-rebuild switch
-  2) Build and test without switching
-  ↳ sudo nixos-rebuild build
-  3) Dry run to see changes
-  ↳ sudo nixos-rebuild dry-build
 
 [Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
 ```
 
-### Scout mode
+</details>
 
-Press `s` to let the model explore your environment first:
+<details>
+<summary>Keybindings</summary>
+
+| Context | Key | Action |
+|---|---|---|
+| Command selection | `Enter` | Run option 1 |
+| | `1`–`9` | Select option |
+| | `s` | Scout mode |
+| | `r` | Regenerate |
+| | `a` | Ask menu |
+| | `Esc` | Cancel |
+| Scout approval | `Enter` | Run scout cmd |
+| | `s` | Skip |
+| | `r` | Alternative scout |
+| | `Esc` | Cancel scout |
+| Confirmation | `Enter` | Execute |
+| | `c` | Copy to clipboard |
+| | `Esc` | Cancel |
+| Ask menu | `1`–`5`,`0` | Select request |
+| | `Esc` | Back |
+| `!api` menu | `1`–`3` | Edit field |
+| | `s` | Save & exit |
+| | `c` / `Esc` | Cancel |
+| REPL input | `⭠⭢` | Move cursor |
+| | `Home` / `End` | Jump ends |
+| | `Delete` | Delete at cursor |
+| | `Ctrl+W` | Delete word |
+| | `Ctrl+U` | Clear line |
+| | `Esc` | Empty input |
+| REPL commands | `!api` | Config menu |
+| | `!config` | Show config |
+| | `!help` | Help screen |
+| | `!cmd <cmd>` | Run shell cmd |
+| | `!quit` / `!q` | Exit |
+| | `↑` / `↓` | History recall |
+
+</details>
+
+<details>
+<summary>Scout mode</summary>
+
+Press `s` from the command selection to let the model explore your environment first:
 
 ```
-[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
 s
 Scouting...
   1. $ which nixos-rebuild
@@ -55,59 +92,19 @@ Scouting...
   ✓ 0s
   
   2. $ ls -la /etc/nixos
-  [Enter=run s=skip r=regen Esc=cancel]
   ✓ 0s
-  
-  3. $ find /home -name "*.nix"
-  [Enter=run s=skip r=regen Esc=cancel]
-  r
-  [regenerating...]
-  4. $ cat /etc/nixos/configuration.nix
-  [Enter=run s=skip r=regen Esc=cancel]
-  ✗ 1s
-  [r=regen s=skip]
-  s
-  [skipped]
-
-Generated commands:
-  1) Rebuild with upgrade
-  ↳ sudo nixos-rebuild switch --upgrade
-  ...
 ```
 
-Scout commands run with approval:
-- `Enter` - Run the scout command
-- `s` - Skip this command
-- `r` - Generate alternative scout command
-- `Esc` - Cancel scout mode
+Per scout command: `Enter` run, `s` skip, `r` alternative, `Esc` cancel.
 
-On failure, choose `r=regen` or `s=skip`. Commands blocked if dangerous (`find /`, `rm`, `sudo`, etc.).
+On failure, the prompt shows `[r=regen s=skip]`. Commands are blocked if dangerous (`find /`, `rm`, `sudo`, etc.).
 
-Scout runs exploratory commands to gather context before proposing final commands.
+</details>
 
-### Confirmation
+<details>
+<summary>Ask menu</summary>
 
-After selecting a command, you see a confirmation prompt:
-
-```
-↳ sudo nixos-rebuild switch
-[Enter=run c=copy Esc=cancel]
-```
-
-- `Enter` - Run the command
-- `c` - Copy to clipboard (wl-copy/xclip/xsel)
-- `Esc` - Cancel
-
-For sudo commands, a warning is shown:
-
-```
-⚠ sudo: sudo nixos-rebuild switch
-[Enter=run c=copy Esc=cancel]
-```
-
-### Ask menu
-
-Press `a` to request changes:
+Press `a` from the command selection:
 
 ```
 What do you want?
@@ -120,118 +117,122 @@ What do you want?
   Esc) Cancel
 ```
 
-### Running indicator
+The model may also initiate clarification (shows choices you can select or type a freeform answer).
 
-Commands show elapsed time while running:
+</details>
+
+<details>
+<summary>Confirmation</summary>
 
 ```
-[running] (3s)
+→ sudo nixos-rebuild switch
+[Enter=run c=copy Esc=cancel]
 ```
 
-### First run
+- **Sudo commands** show `⚠ sudo:` in red
+- **c** copies to clipboard (wl-copy / xclip / xsel)
+- Commands run through `$SHELL` so aliases and functions work
+- Elapsed time shown inline: `[running] (3s)`
+- 30s timeout with progress indicator
+
+</details>
+
+<details>
+<summary>First run</summary>
 
 Prompts for:
 
-1. Base URL (required)
-2. Model (required)
-3. API key (optional - skip for local services)
+1. **Base URL** — e.g. `https://api.openai.com/v1`
+2. **Model** — e.g. `gpt-4o`
+3. **API key** — masked input (`*` echoed), skip for local services
 
-## Configuration
+Press `Esc` at any prompt to cancel (exits if setup incomplete).
 
-Config stored at `~/.config/nlsh/config`:
+</details>
+
+<details>
+<summary>Configuration</summary>
+
+Config file: `~/.config/nlsh/config`
 
 | Variable | Required | Description |
-|----------|----------|-------------|
+|---|---|---|
 | `NLSH_BASE_URL` | yes | API endpoint |
-| `NLSH_MODEL` | yes | Model to use |
-| `NLSH_API_KEY` | no | API key (skip for local services) |
+| `NLSH_MODEL` | yes | Model name |
+| `NLSH_API_KEY` | no | API key (skip for local) |
 
-**Env vars take precedence over config file.**
+Env vars take precedence over the config file. Use `!api` from REPL for interactive editing.
 
-### Examples
+<details>
+<summary>Provider examples</summary>
 
-**OpenAI:**
+**OpenAI**
 
 ```bash
-export NLSH_API_KEY=<api-key>
+export NLSH_API_KEY=sk-...
 export NLSH_BASE_URL=https://api.openai.com/v1
-export NLSH_MODEL=<model-name>
+export NLSH_MODEL=gpt-4o
 ```
 
-**Ollama:**
+**Ollama**
 
 ```bash
 export NLSH_BASE_URL=http://localhost:11434/v1
-export NLSH_MODEL=<model-name>
+export NLSH_MODEL=llama3.2
 ```
 
-**vLLM / LM Studio:**
+**vLLM / LM Studio**
 
 ```bash
 export NLSH_BASE_URL=http://localhost:8000/v1
-export NLSH_MODEL=<model-name>
+export NLSH_MODEL=my-model
 ```
 
-## Nix
+</details>
+</details>
 
-### Run directly
+<details>
+<summary>Nix</summary>
 
 ```bash
+# Run directly
 nix run github:PopCat19/nlsh-nix
-```
 
-### Temporary shell
+# Temporary shell
+nix shell github:PopCat19/nlsh-nix && nlsh
 
-```bash
-nix shell github:PopCat19/nlsh-nix
-nlsh
-```
-
-### Install to profile
-
-```bash
+# Install
 nix profile add github:PopCat19/nlsh-nix
-nlsh
-```
 
-### Update
-
-```bash
+# Update
 nix profile upgrade nlsh-nix --refresh
+
+# Flake input
+# inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
 ```
 
-### Remove
+</details>
 
-```bash
-nix profile remove nlsh-nix
-rm -rf ~/.config/nlsh
-```
+<details>
+<summary>Differences from upstream</summary>
 
-### Flake inputs
-
-```nix
-{
-  inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
-}
-```
-
-## Differences from upstream
-
-- OpenAI-compatible API (supports OpenAI, Ollama, vLLM, etc.)
-- Modular codebase (config, history, llm, ui, main)
-- Config at `~/.config/nlsh/config` (XDG-friendly)
+- OpenAI-compatible API (OpenAI, Ollama, vLLM, LM Studio, etc.)
 - One-shot mode with command-line args
-- Multiple command proposals (3 options) with descriptions
-- Scout mode - model explores environment before proposing
-- Commands run through `$SHELL` (aliases/functions work)
-- Shell context (aliases/fish abbr) included in prompts
-- Confirmation before running with copy option
+- Multiple command proposals (up to 3) with descriptions
+- Scout mode — model explores environment before proposing
+- Confirmation with clipboard copy
 - Sudo detection with warning
 - Running indicator with elapsed time
-- Ask menu with numbered options (1-0)
+- Ask menu with numbered options (1–0) and freeform
 - Model-initiated clarification with choices
 - Regen history visible to model for learning
 - 30s timeout with progress indicator
-- Interactive `!api` menu with cancel
-- Native ESC/backspace handling in inputs
-- Version format: yyyymmdd-<rev>
+- Interactive `!api` menu with masked API key input
+- ESC/backspace/arrow/home/end/delete/Ctrl+W/Ctrl+U in REPL input
+- History recall (↑/↓) in REPL
+- Config at `~/.config/nlsh/config` (XDG-friendly)
+- Commands run through `$SHELL` (aliases/functions work)
+- Shell context (fish abbr) included in prompts
+- Version format: yyyymmdd-&lt;rev&gt;
+
+</details>
