@@ -42,7 +42,7 @@ def raw_input(prompt: str) -> str:
     pos = 0
 
     def redraw():
-        sys.stdout.write("\r" + prompt + "".join(buffer))
+        sys.stdout.write("\r" + prompt + "".join(buffer) + "\033[K")
         sys.stdout.write("\r" + prompt + "".join(buffer[:pos]))
         sys.stdout.flush()
 
@@ -65,7 +65,8 @@ def raw_input(prompt: str) -> str:
                     ch += sys.stdin.read(1)
                 seq = ch
                 if seq == "\x1b":
-                    print()
+                    sys.stdout.write("\r\n")
+                    sys.stdout.flush()
                     return ""
                 elif seq in ("\x1b[C", "\x1bOC"):
                     if pos < len(buffer):
@@ -86,7 +87,8 @@ def raw_input(prompt: str) -> str:
                         buffer.pop(pos)
                         redraw()
             elif ch in ("\r", "\n"):
-                print()
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
                 return "".join(buffer)
             elif ch in ("\x7f", "\x08"):
                 if pos > 0:
@@ -101,7 +103,8 @@ def raw_input(prompt: str) -> str:
                 pos = 0
                 redraw()
             elif ch == "\x03":
-                print()
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
                 return ""
             elif ch.isprintable():
                 buffer.insert(pos, ch)
@@ -128,10 +131,12 @@ def secret_input(prompt: str) -> str:
                 while select.select([sys.stdin], [], [], 0.03)[0]:
                     ch += sys.stdin.read(1)
                 if ch == "\x1b":
-                    print()
+                    sys.stdout.write("\r\n")
+                    sys.stdout.flush()
                     return ""
             elif ch in ("\r", "\n"):
-                print()
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
                 return "".join(buffer)
             elif ch in ("\x7f", "\x08"):
                 if buffer:
@@ -139,7 +144,8 @@ def secret_input(prompt: str) -> str:
                     sys.stdout.write("\b \b")
                     sys.stdout.flush()
             elif ch == "\x03":
-                print()
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
                 return ""
             elif ch.isprintable():
                 buffer.append(ch)
