@@ -10,6 +10,8 @@ import os
 import sys
 import subprocess
 import readline
+import tty
+import termios
 
 def exit_handler(sig, frame):
     print()
@@ -71,6 +73,20 @@ def setup_api_key():
 
     save_config()
     print("\033[32m✓ Config saved!\033[0m\n")
+
+def get_single_key():
+    """Read a single keypress without requiring Enter."""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+        # Handle escape sequences (arrow keys, etc)
+        if ch == '\x1b':
+            ch += sys.stdin.read(2)  # Read rest of escape sequence
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
 
 def show_help():
     print("\033[36m!api\033[0m       - Change API key/config")
@@ -191,6 +207,29 @@ def is_natural_language(text: str) -> bool:
     return not any(text.startswith(s) for s in shell_starters)
 
 def main():
+    # Handle command-line args (one-shot mode)
+    args = ' '.join(sys.argv[1:])
+    if args:
+        cwd = os.getcwd()
+        command = get_command(args, cwd)
+        print(f"\033[33m→ {command}\033[0m")
+        print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
+        key = get_single_key()
+        if key == '\r' or key == '\n':  # Enter
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
+        elif key == 'r':
+            command = get_command(args, cwd)
+            print(f"\033[33m→ {command}\033[0m")
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
+        # ESC or anything else: cancel (exit silently)
+        sys.exit(0)
+
     while True:
         try:
             cwd = os.getcwd()
@@ -261,9 +300,10 @@ def main():
                 continue
 
             while True:
-                confirm = input(f"\033[33m→ {command}\033[0m [Enter=run r=regen s=skip q=quit]: ")
+                print(f"\033[33m→ {command}\033[0m \033[36m[Enter=run r=regen Esc=cancel]\033[0m")
+                key = get_single_key()
                 
-                if confirm == "":
+                if key == '\r' or key == '\n':  # Enter
                     if command.startswith("cd "):
                         path = os.path.expanduser(command[3:].strip())
                         try:
@@ -276,22 +316,20 @@ def main():
                         if result.stderr:
                             print(result.stderr, end="")
                         add_to_history(command, result.stdout + result.stderr)
+                    print()  # Newline after output
                     break
-                elif confirm == "r":
+                elif key == 'r':
                     try:
                         command = get_command(user_input, cwd)
                     except TimeoutError:
                         print("\033[31mtimed out - press r to retry\033[0m")
-                        continue
                     except Exception as e:
                         print(f"\033[31merror: {e}\033[0m")
-                        continue
-                elif confirm == "s":
+                elif key == '\x1b':  # ESC
+                    print()  # Newline for clean exit
                     break
-                elif confirm == "q":
-                    print("\033[36mo7\033[0m")
-                    sys.exit(0)
                 else:
+                    print()  # Newline for unknown key
                     break
 
         except EOFError:
