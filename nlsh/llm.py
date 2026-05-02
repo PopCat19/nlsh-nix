@@ -135,7 +135,7 @@ Output only the scout commands, nothing else:"""
         
         # Ask for approval
         print(f"  {i}. $ {cmd}")
-        print(f"  [Enter=run s=skip Esc=cancel]", end='', flush=True)
+        print(f"  [Enter=run s=skip r=regen Esc=cancel]", end='', flush=True)
         key = get_single_key()
         print()  # Newline after input
         
@@ -145,11 +145,16 @@ Output only the scout commands, nothing else:"""
         elif key == 's' or key == 'S':  # Skip
             print(f"  \033[90m[skipped]\033[0m")
             continue
+        elif key == 'r' or key == 'R':  # Regen - skip this one, will add new
+            print(f"  \033[90m[skipped - generate alternative]\033[0m")
+            continue
         elif key == '\r' or key == '\n':  # Run
+            start = time.time()
             try:
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                elapsed = int(time.time() - start)
                 status = "\033[32m✓\033[0m" if result.returncode == 0 else f"\033[31m✗ ({result.returncode})\033[0m"
-                print(f"  \033[90m{status}\033[0m")
+                print(f"  {status} \033[90m{elapsed}s\033[0m")
                 output = (result.stdout + result.stderr)
                 scout_results.append(f"$ {cmd}\n{output[:500]}")
             except subprocess.TimeoutExpired:
