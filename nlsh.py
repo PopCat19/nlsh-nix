@@ -302,7 +302,8 @@ Recent command history:
 Rules:
 - Output ONLY the command, nothing else
 - No explanations, no markdown, no backticks
-- If unclear, make a reasonable assumption
+- If the request is ambiguous or vague, respond with: CLARIFY: <your question>
+- Otherwise, make a reasonable assumption
 - Prefer simple, common commands
 - Prefer using available aliases/abbreviations when they match
 - Use the command history for context (e.g., "do that again", "delete the file I just created"){clarification_section}
@@ -317,7 +318,12 @@ User request: {user_input}"""
                 max_tokens=256,
                 timeout=TIMEOUT,
             )
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+        
+        # Check if model is asking for clarification
+        if result.startswith("CLARIFY:"):
+            return (None, result[8:].strip())
+        return (result, None)
     except Exception as e:
         if "timeout" in str(e).lower() or "timed out" in str(e).lower():
             raise TimeoutError("Request timed out")
@@ -343,8 +349,12 @@ def main():
     args = ' '.join(sys.argv[1:])
     if args:
         cwd = os.getcwd()
-        command = get_command(args, cwd)
-        regen_count = 0
+        result, clarify_q = get_command(args, cwd)
+        if clarify_q:
+            print(f"\033[36mModel asks: {clarify_q}\033[0m")
+            clarification = input("\033[33mAnswer: \033[0m").strip()
+            result, _ = get_command(args, cwd, clarification)
+        command = result
         
         regen_count = 0
         clarification = ""
@@ -362,11 +372,19 @@ def main():
                     print(result.stderr, end="")
                 sys.exit(0)
             elif key == 'r':
-                command = get_command(args, cwd, clarification)
+                result, clarify_q = get_command(args, cwd, clarification)
+                if clarify_q:
+                    print(f"\033[36mModel asks: {clarify_q}\033[0m")
+                    answer = input("\033[33mAnswer: \033[0m").strip()
+                    if answer:
+                        clarification = f"{clarification} {answer}".strip() if clarification else answer
+                    result, _ = get_command(args, cwd, clarification)
+                command = result
                 regen_count += 1
             elif key == 'c':
                 clarification = input("\033[33mClarify: \033[0m").strip()
-                command = get_command(args, cwd, clarification)
+                result, _ = get_command(args, cwd, clarification)
+                command = result
                 regen_count += 1
             elif key == '\x1b':  # ESC
                 sys.exit(0)
@@ -434,7 +452,12 @@ def main():
                 continue
 
             try:
-                command = get_command(user_input, cwd)
+                result, clarify_q = get_command(user_input, cwd)
+                if clarify_q:
+                    print(f"\033[36mModel asks: {clarify_q}\033[0m")
+                    clarification = input("\033[33mAnswer: \033[0m").strip()
+                    result, _ = get_command(user_input, cwd, clarification)
+                command = result
             except TimeoutError:
                 print("\033[31mtimed out\033[0m")
                 continue
@@ -467,7 +490,14 @@ def main():
                     break
                 elif key == 'r':
                     try:
-                        command = get_command(user_input, cwd, clarification)
+                        result, clarify_q = get_command(user_input, cwd, clarification)
+                        if clarify_q:
+                            print(f"\033[36mModel asks: {clarify_q}\033[0m")
+                            answer = input("\033[33mAnswer: \033[0m").strip()
+                            if answer:
+                                clarification = f"{clarification} {answer}".strip() if clarification else answer
+                            result, _ = get_command(user_input, cwd, clarification)
+                        command = result
                         regen_count += 1
                     except TimeoutError:
                         print("\033[31mtimed out - press r to retry\033[0m")
@@ -476,7 +506,8 @@ def main():
                 elif key == 'c':
                     clarification = input("\033[33mClarify: \033[0m").strip()
                     try:
-                        command = get_command(user_input, cwd, clarification)
+                        result, _ = get_command(user_input, cwd, clarification)
+                        command = result
                         regen_count += 1
                     except TimeoutError:
                         print("\033[31mtimed out\033[0m")
