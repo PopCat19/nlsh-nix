@@ -344,9 +344,9 @@ def main():
         regen_count = 0
         
         while True:
+            print(f"\033[33m→ {command}\033[0m")
             regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
-            print(f"\033[33m→ {command}\033[0m{regen_str}")
-            print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
+            print(f"\033[36m[Enter=run r=regen Esc=cancel]{regen_str}\033[0m")
             key = get_single_key()
             
             if key == '\r' or key == '\n':  # Enter
@@ -434,9 +434,9 @@ def main():
 
             regen_count = 0
             while True:
-                regen_str = f" \033[36m(regen {regen_count})\033[0m" if regen_count > 0 else ""
-                print(f"\033[33m→ {command}\033[0m{regen_str}")
-                print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
+                print(f"\033[33m→ {command}\033[0m")
+                regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
+                print(f"\033[36m[Enter=run r=regen Esc=cancel]{regen_str}\033[0m")
                 key = get_single_key()
                 
                 if key == '\r' or key == '\n':  # Enter
