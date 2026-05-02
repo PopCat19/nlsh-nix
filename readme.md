@@ -10,16 +10,16 @@ NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmood/nlsh) wi
 nlsh list all python files
 [awaiting API response...] (1s/30s)
 → find . -name "*.py"
-[Enter=run r=regen c=clarify Esc=cancel]
+[Enter=run r=regen a=ask Esc=cancel]
 ```
 
-Press `Enter` to run, `r` to regenerate, `c` to clarify, `Esc` to cancel.
+Press `Enter` to run, `r` to regenerate, `a` to ask for changes, `Esc` to cancel.
 
 ### REPL mode
 
 ```bash
 nlsh
-nlsh e005ac3 (20260502) - model: ministral-3:8b
+nlsh 7abc282 (20260502) - model: ministral-3:8b
 
 !api       - Change API key/config
 !config   - Show current config
@@ -30,38 +30,47 @@ nlsh e005ac3 (20260502) - model: ministral-3:8b
 popcat19 > nixos rebuild
 [awaiting API response...] (2s/30s)
 → nixos-rebuild switch
-[Enter=run r=regen c=clarify Esc=cancel]
+[Enter=run r=regen a=ask Esc=cancel]
 ```
 
-### Clarifying suggestions
+### Ask menu
 
-When the suggestion isn't quite right, press `c` to provide guidance:
+Press `a` to request changes:
 
 ```
-→ nix-env -f /nix/store/... rebuild switch
-[Enter=run r=regen c=clarify Esc=cancel]
-c
-Clarify: use home-manager
-[awaiting API response...] (1s/30s)
-→ home-manager switch
-[Enter=run r=regen c=clarify Esc=cancel] (regen 1)
+→ nixos-rebuild switch
+[Enter=run r=regen a=ask Esc=cancel]
+a
+What do you want?
+  1) Clarify the request
+  2) A different command
+  3) Modify this command
+  4) Safer/alternative approach
+  5) Something completely different
+  0) Custom description
+  Esc) Cancel
 ```
+
+Press `Esc` to cancel without changes.
 
 ### Model-initiated clarification
 
-If your request is vague, the model may ask for clarification first:
+If your request is vague, the model may ask for clarification:
 
 ```
 popcat19 > delete the file
 [awaiting API response...] (1s/30s)
-Model asks: Which file do you want to delete?
-Answer: config.json
+Which file do you want to delete?
+  1) config.json
+  2) *.log files
+  3) Everything in ./tmp
+  0) Custom (describe what you want)
+
+Select 1-0, or type answer: 1
 [awaiting API response...] (1s/30s)
 → rm config.json
-[Enter=run r=regen c=clarify Esc=cancel]
+[Enter=run r=regen a=ask Esc=cancel]
 ```
-
-Clarifications persist across regenerations. Press `c` with empty input to clear.
 
 ### Commands
 
@@ -79,11 +88,11 @@ Clarifications persist across regenerations. Press `c` with empty input to clear
 | Key | Action |
 |-----|--------|
 | `Enter` | Run the suggested command |
-| `r` | Regenerate suggestion |
-| `c` | Clarify with comment and regenerate |
-| `Esc` | Cancel (back to prompt) |
+| `r` | Regenerate suggestion (model sees history) |
+| `a` | Ask menu for changes |
+| `Esc` | Cancel |
 
-The `(regen N)` counter shows how many times you've regenerated.
+The `(regen N)` counter shows regeneration attempts.
 
 ### Behavior
 
@@ -91,6 +100,7 @@ The `(regen N)` counter shows how many times you've regenerated.
 - Shell commands (`ls`, `git`, `nix`, etc.) run directly without LLM
 - `cd` works natively for directory navigation
 - Shell-aware: uses your aliases (bash/zsh) and abbreviations (fish)
+- Model sees previous regeneration attempts
 - 30s timeout with progress indicator
 
 ### First run
@@ -183,12 +193,13 @@ rm -rf ~/.config/nlsh
 ## Differences from upstream
 
 - OpenAI-compatible API (supports OpenAI, Ollama, vLLM, etc.)
-- Fixed shebang for NixOS compatibility
+- Modular codebase (config, history, llm, ui, main)
 - Config at `~/.config/nlsh/config` (XDG-friendly)
 - One-shot mode with command-line args
 - Shell context (aliases/fish abbr) included in prompts
-- Single-key confirmation (Enter/r/c/Esc)
-- Clarify mode for guided regeneration
-- Regen counter to track iterations
+- Single-key confirmation (Enter/r/a/Esc)
+- Ask menu with numbered options (1-0)
+- Model-initiated clarification with choices
+- Regen history visible to model for learning
 - Timeout indicator with progress
-- Interactive `!api` menu with cancel option
+- Interactive `!api` menu with cancel

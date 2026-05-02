@@ -67,12 +67,27 @@ def show_ask_options():
 def run_oneshot(args: str):
     cwd = os.getcwd()
     reset_regen_history()
-    result, clarify_data = get_command(args, cwd)
-    if clarify_data:
-        question, options = clarify_data
-        clarification = prompt_clarify(question, options)
-        result, _ = get_command(args, cwd, clarification)
-    command = result
+    
+    try:
+        result, clarify_data = get_command(args, cwd)
+        if clarify_data:
+            question, options = clarify_data
+            clarification = prompt_clarify(question, options)
+            if not clarification:
+                print("\033[31mNo clarification provided\033[0m")
+                sys.exit(1)
+            result, _ = get_command(args, cwd, clarification)
+        if not result:
+            print("\033[31mNo command generated\033[0m")
+            sys.exit(1)
+        command = result
+    except TimeoutError:
+        print("\033[31mtimed out\033[0m")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\033[31merror: {e}\033[0m")
+        sys.exit(1)
+    
     add_regen(command)
     
     regen_count = 0
@@ -91,34 +106,73 @@ def run_oneshot(args: str):
                 print(result.stderr, end="")
             sys.exit(0)
         elif key == 'r':
-            result, clarify_data = get_command(args, cwd, clarification)
-            if clarify_data:
-                question, options = clarify_data
-                answer = prompt_clarify(question, options)
-                if answer:
-                    clarification = f"{clarification} {answer}".strip() if clarification else answer
-                result, _ = get_command(args, cwd, clarification)
-            command = result
-            add_regen(command, clarification)
-            regen_count += 1
+            try:
+                result, clarify_data = get_command(args, cwd, clarification)
+                if clarify_data:
+                    question, options = clarify_data
+                    answer = prompt_clarify(question, options)
+                    if answer:
+                        clarification = f"{clarification} {answer}".strip() if clarification else answer
+                    result, _ = get_command(args, cwd, clarification)
+                if result:
+                    command = result
+                    add_regen(command, clarification)
+                    regen_count += 1
+                else:
+                    print("\033[31mNo command generated\033[0m")
+            except TimeoutError:
+                print("\033[31mtimed out\033[0m")
+            except Exception as e:
+                print(f"\033[31merror: {e}\033[0m")
         elif key == 'a':
             show_ask_options()
             choice = get_single_key()
-            if choice == '\x1b':  # ESC - cancel
+            if choice == '\x1b':
                 continue
             elif choice == '0':
                 custom = input("\033[33mDescribe: \033[0m").strip()
-                clarification = f"{clarification} {custom}".strip() if clarification else custom
+                if custom:
+                    clarification = f"{clarification} {custom}".strip() if clarification else custom
+                else:
+                    continue
             elif choice == '1':
                 clarify = input("\033[33mClarify: \033[0m").strip()
-                clarification = f"{clarification} clarify: {clarify}".strip()
+                if clarify:
+                    clarification = f"{clarification} clarify: {clarify}".strip()
+                else:
+                    continue
             elif choice == '2':
                 clarification = f"{clarification} generate a different command".strip()
             elif choice == '3':
                 changes = input("\033[33mDescribe changes: \033[0m").strip()
-                clarification = f"{clarification} modify: {changes}".strip()
+                if changes:
+                    clarification = f"{clarification} modify: {changes}".strip()
+                else:
+                    continue
             elif choice == '4':
                 clarification = f"{clarification} generate a safer alternative".strip()
+            elif choice == '5':
+                new_req = input("\033[33mNew request: \033[0m").strip()
+                if new_req:
+                    args = new_req
+                    reset_regen_history()
+                    clarification = ""
+                else:
+                    continue
+            else:
+                continue
+            try:
+                result, _ = get_command(args, cwd, clarification)
+                if result:
+                    command = result
+                    add_regen(command, clarification)
+                    regen_count += 1
+                else:
+                    print("\033[31mNo command generated\033[0m")
+            except TimeoutError:
+                print("\033[31mtimed out\033[0m")
+            except Exception as e:
+                print(f"\033[31merror: {e}\033[0m")
             elif choice == '5':
                 new_req = input("\033[33mNew request: \033[0m").strip()
                 args = new_req
