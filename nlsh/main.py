@@ -37,6 +37,13 @@ def is_natural_language(text: str) -> bool:
         return False
     return not any(text.startswith(s) for s in shell_starters)
 
+def safe_input(prompt: str) -> str:
+    """Input that handles Ctrl+C gracefully."""
+    try:
+        return input(prompt).strip()
+    except (InterruptedError, KeyboardInterrupt, EOFError):
+        return ""
+
 def prompt_clarify(question: str, options: dict) -> str:
     """Show clarification question with options and get user response."""
     print(f"\033[36m{question}\033[0m")
@@ -44,11 +51,13 @@ def prompt_clarify(question: str, options: dict) -> str:
         print(f"  \033[33m{key}\033[0m) {options[key]}")
     print()
     
-    answer = input("\033[33mSelect 1-0, or type answer: \033[0m").strip()
+    answer = safe_input("\033[33mSelect 1-0, or type answer: \033[0m")
+    if not answer:
+        return ""
     
     if answer in options:
         if answer == '0' and 'custom' in options.get('0', '').lower():
-            custom = input("\033[33mDescribe: \033[0m").strip()
+            custom = safe_input("\033[33mDescribe: \033[0m")
             return custom
         return options[answer]
     return answer
@@ -130,13 +139,13 @@ def run_oneshot(args: str):
             if choice == '\x1b':
                 continue
             elif choice == '0':
-                custom = input("\033[33mDescribe: \033[0m").strip()
+                custom = safe_input("\033[33mDescribe: \033[0m")
                 if custom:
                     clarification = f"{clarification} {custom}".strip() if clarification else custom
                 else:
                     continue
             elif choice == '1':
-                clarify = input("\033[33mClarify: \033[0m").strip()
+                clarify = safe_input("\033[33mClarify: \033[0m")
                 if clarify:
                     clarification = f"{clarification} clarify: {clarify}".strip()
                 else:
@@ -144,7 +153,7 @@ def run_oneshot(args: str):
             elif choice == '2':
                 clarification = f"{clarification} generate a different command".strip()
             elif choice == '3':
-                changes = input("\033[33mDescribe changes: \033[0m").strip()
+                changes = safe_input("\033[33mDescribe changes: \033[0m")
                 if changes:
                     clarification = f"{clarification} modify: {changes}".strip()
                 else:
@@ -152,7 +161,7 @@ def run_oneshot(args: str):
             elif choice == '4':
                 clarification = f"{clarification} generate a safer alternative".strip()
             elif choice == '5':
-                new_req = input("\033[33mNew request: \033[0m").strip()
+                new_req = safe_input("\033[33mNew request: \033[0m")
                 if new_req:
                     args = new_req
                     reset_regen_history()
@@ -303,32 +312,48 @@ def run_repl():
                 elif key == 'a':
                     show_ask_options()
                     choice = get_single_key()
-                    if choice == '\x1b':  # ESC - cancel
+                    if choice == '\x1b':
                         continue
                     elif choice == '0':
-                        custom = input("\033[33mDescribe: \033[0m").strip()
-                        clarification = f"{clarification} {custom}".strip() if clarification else custom
+                        custom = safe_input("\033[33mDescribe: \033[0m")
+                        if custom:
+                            clarification = f"{clarification} {custom}".strip() if clarification else custom
+                        else:
+                            continue
                     elif choice == '1':
-                        clarify = input("\033[33mClarify: \033[0m").strip()
-                        clarification = f"{clarification} clarify: {clarify}".strip()
+                        clarify = safe_input("\033[33mClarify: \033[0m")
+                        if clarify:
+                            clarification = f"{clarification} clarify: {clarify}".strip()
+                        else:
+                            continue
                     elif choice == '2':
                         clarification = f"{clarification} generate a different command".strip()
                     elif choice == '3':
-                        changes = input("\033[33mDescribe changes: \033[0m").strip()
-                        clarification = f"{clarification} modify: {changes}".strip()
+                        changes = safe_input("\033[33mDescribe changes: \033[0m")
+                        if changes:
+                            clarification = f"{clarification} modify: {changes}".strip()
+                        else:
+                            continue
                     elif choice == '4':
                         clarification = f"{clarification} generate a safer alternative".strip()
                     elif choice == '5':
-                        new_req = input("\033[33mNew request: \033[0m").strip()
-                        user_input = new_req
-                        reset_regen_history()
+                        new_req = safe_input("\033[33mNew request: \033[0m")
+                        if new_req:
+                            user_input = new_req
+                            reset_regen_history()
+                            clarification = ""
+                        else:
+                            continue
                     else:
                         continue
                     try:
                         result, _ = get_command(user_input, cwd, clarification)
-                        command = result
-                        add_regen(command, clarification)
-                        regen_count += 1
+                        if result:
+                            command = result
+                            add_regen(command, clarification)
+                            regen_count += 1
+                        else:
+                            print("\033[31mNo command generated\033[0m")
                     except TimeoutError:
                         print("\033[31mtimed out\033[0m")
                     except Exception as e:
