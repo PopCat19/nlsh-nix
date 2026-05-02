@@ -327,6 +327,38 @@ def get_commands(user_input, cwd, store, clarification="", terminal_history=""):
         raise
 
 
+def _show_scout_preview(scout_cmds, skipped):
+    print("\033[36mProposed scout commands:\033[0m")
+    for i, cmd in enumerate(scout_cmds, 1):
+        status = (
+            "\033[31m[skip]\033[0m" if i in skipped else "\033[32m[run]\033[0m"
+        )
+        print(f"  \033[33m{i}\033[0m. $ {cmd} {status}")
+    print()
+    print(
+        f"\033[36m[Enter=run-selected r=regen "
+        f"1-{len(scout_cmds)}=toggle Esc=cancel]\033[0m"
+    )
+    return get_single_key()
+
+
+def _display_scout_output(cmd, result, elapsed):
+    status = (
+        "\033[32m✓\033[0m" if result.returncode == 0 else "\033[31m✗\033[0m"
+    )
+    output = (result.stdout + result.stderr).strip()
+    line_count = output.count("\n") + 1 if output else 0
+    print(f"  {status} \033[90m{elapsed}s\033[0m", end="")
+    if line_count:
+        print(f"  \033[90m({line_count} lines)\033[0m")
+    else:
+        print()
+    if output:
+        for line in output.split("\n")[:5]:
+            print(f"     \033[90m{line[:100]}\033[0m")
+    return output
+
+
 def get_scout_cmd(user_input, cwd, rejected=""):
     shell_ctx = ensure_shell_context()
     reject_section = (
@@ -370,18 +402,60 @@ def scout_and_get_commands(user_input, cwd, store):
     except Exception:
         scout_cmds = ["ls -la", "pwd"]
 
+    if not scout_cmds:
+        scout_cmds = ["ls -la", "pwd"]
+
+    # Step 1.5: Preview and review
+    skipped = set()
+    while True:
+        key = _show_scout_preview(scout_cmds, skipped)
+        if key in ("\r", "\n"):
+            break
+        elif key == "r":
+            try:
+                result = _call_api([{"role": "user", "content": prompt}])
+                scout_cmds = [
+                    c.strip()
+                    for c in result.strip().split("\n")
+                    if c.strip() and "sudo" not in c.strip()
+                ]
+                scout_cmds = [
+                    c for c in scout_cmds
+                    if not c.startswith("```") and c != ""
+                ]
+                scout_cmds = scout_cmds[:5]
+                skipped = set()
+            except Exception:
+                pass
+        elif key == "\x1b":
+            print("\033[31mScout cancelled\033[0m")
+            return [Command(cmd="echo 'scout cancelled'")]
+        elif key.isdigit():
+            idx = int(key)
+            if 1 <= idx <= len(scout_cmds):
+                if idx in skipped:
+                    skipped.discard(idx)
+                else:
+                    skipped.add(idx)
+
     # Step 2: Run scouts with approval
-    print("\033[36mScouting...\033[0m")
     scout_results = []
     blocked = {"find / ", " rm ", " dd ", "mkfs", "sudo", " > "}
 
     for i, cmd in enumerate(scout_cmds, 1):
         if cmd.startswith("rm ") or any(p in cmd for p in blocked):
-            print(f"  {i}. $ {cmd} \033[31m[blocked]\033[0m")
+            print(f"  {i}. ⚙ bash $ {cmd} \033[31m[blocked]\033[0m")
             continue
 
-        print(f"  {i}. $ {cmd}")
-        print("  \033[36m[Enter=run s=skip r=regen Esc=cancel]\033[0m", end="", flush=True)
+        if i in skipped:
+            print(f"  {i}. ⚙ bash $ {cmd} \033[90m[skipped]\033[0m")
+            continue
+
+        print(f"  {i}. ⚙ bash $ {cmd}")
+        print(
+            "  \033[36m[Enter=run s=skip r=regen Esc=cancel]\033[0m",
+            end="", flush=True,
+        )
         key = get_single_key()
         print()
 
@@ -401,18 +475,16 @@ def scout_and_get_commands(user_input, cwd, store):
             start = time.time()
             try:
                 result = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True, timeout=10
+                    cmd, shell=True, capture_output=True,
+                    text=True, timeout=10,
                 )
                 elapsed = int(time.time() - start)
-                status = (
-                    "\033[32m✓\033[0m"
-                    if result.returncode == 0
-                    else "\033[31m✗\033[0m"
-                )
-                print(f"  {status} \033[90m{elapsed}s\033[0m")
+                output = _display_scout_output(cmd, result, elapsed)
+
                 if result.returncode != 0:
                     print(
-                        "  \033[36m[r=regen s=skip]\033[0m", end="", flush=True
+                        "  \033[36m[r=regen s=skip]\033[0m",
+                        end="", flush=True,
                     )
                     retry = get_single_key()
                     print()
@@ -422,11 +494,17 @@ def scout_and_get_commands(user_input, cwd, store):
                         if new_cmd:
                             scout_cmds.insert(i, new_cmd)
                         continue
-                output = result.stdout + result.stderr
-                scout_results.append(f"$ {cmd}\n{output[:500]}")
+
+                full_output = result.stdout + result.stderr
+                scout_results.append(
+                    f"$ {cmd}\n{full_output[:500]}"
+                )
             except subprocess.TimeoutExpired:
                 print(f"  \033[31m✗ (timeout)\033[0m")
-                print("  \033[36m[r=regen s=skip]\033[0m", end="", flush=True)
+                print(
+                    "  \033[36m[r=regen s=skip]\033[0m",
+                    end="", flush=True,
+                )
                 retry = get_single_key()
                 print()
                 if retry in ("r", "R"):
