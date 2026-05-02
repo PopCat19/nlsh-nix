@@ -8,6 +8,7 @@
 # - Gathers shell context (aliases, abbreviations)
 
 import os
+import json
 import time
 import subprocess
 
@@ -63,25 +64,6 @@ Rules:
 
 User request: {user_input}"""
 
-PROMPT_SCOUT_LIST = """You are scouting a shell environment. What commands should you run to understand the context for this request?
-
-{shell_context}
-Current directory: {cwd}
-
-Rules:
-- Output ONLY the commands to run, one per line
-- Scouts MUST be purely observational / readonly
-- Never change files, permissions, processes, or system state
-- NO sudo allowed
-- Keep it minimal (2-5 commands max)
-- Safe scouts: ls, cat, head, tail, file, stat, which, find (not /), grep, rg,
-  ps, df, du, free, echo, git log, git status, git diff, systemctl status,
-  journalctl, nix eval, nix flake show, curl/wget to stdout
-
-Request: {user_input}
-
-Output only the scout commands, nothing else:"""
-
 PROMPT_SCOUT_SINGLE = """Generate ONE scout command to gather context for this request.
 
 {shell_context}
@@ -133,6 +115,95 @@ def _is_blocked_scout(cmd):
             return True
     return False
 
+
+BASH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "bash",
+        "description": (
+            "Execute a bash command in the current working directory. "
+            "Returns stdout and stderr. Use for scouting and gathering "
+            "information about the environment. "
+            "Commands must be purely observational/readonly — never "
+            "change files, permissions, processes, or system state."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "Bash command to execute",
+                },
+            },
+            "required": ["command"],
+        },
+    },
+}
+
+
+READ_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "read",
+        "description": (
+            "Read the contents of a file at the given path. "
+            "Returns the file contents truncated to 2000 lines or 50KB."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to the file to read",
+                },
+            },
+            "required": ["path"],
+        },
+    },
+}
+
+SCOUT_TOOLS = [BASH_TOOL, READ_TOOL]
+
+
+def _execute_tool(tool_name, args, cwd):
+    if tool_name == "bash":
+        cmd = args.get("command", "")
+        if not cmd:
+            return "(no command provided)"
+        if _is_blocked_scout(cmd) or "sudo" in cmd:
+            return f"[blocked] {cmd}"
+        try:
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, timeout=10,
+            )
+            output = (result.stdout + result.stderr).strip()
+            return output[:2000] if output else "(no output)"
+        except subprocess.TimeoutExpired:
+            return "(timeout)"
+        except Exception as e:
+            return f"(error: {e})"
+
+    elif tool_name == "read":
+        path = os.path.expanduser(args.get("path", ""))
+        if not path:
+            return "(no path provided)"
+        try:
+            with open(path, "r", errors="replace") as f:
+                lines = f.readlines()[:2000]
+            content = "".join(lines)
+            size = len(content.encode("utf-8"))
+            if size > 50000:
+                content = content[:50000] + "\n... (truncated)"
+            return content if content.strip() else "(empty file)"
+        except FileNotFoundError:
+            return "(file not found)"
+        except PermissionError:
+            return "(permission denied)"
+        except Exception as e:
+            return f"(error: {e})"
+
+    return "(unknown tool)"
+
 # --- Client ---
 
 def init_client(config):
@@ -154,6 +225,19 @@ def _call_api(messages, max_tokens=256):
             timeout=TIMEOUT,
         )
     return response.choices[0].message.content.strip()
+
+
+def _call_api_tools(messages, tools, max_tokens=256):
+    with AwaitIndicator():
+        response = _client.chat.completions.create(
+            model=os.environ["NLSH_MODEL"],
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            max_tokens=max_tokens,
+            timeout=TIMEOUT,
+        )
+    return response.choices[0].message
 
 
 # --- Response Parsing ---
@@ -369,34 +453,24 @@ def get_commands(user_input, cwd, store, clarification="", terminal_history=""):
 
 def _show_scout_preview(scout_cmds, skipped):
     print("\033[36mProposed scout commands:\033[0m")
-    for i, cmd in enumerate(scout_cmds, 1):
+    for i, item in enumerate(scout_cmds, 1):
         status = (
             "\033[31m[skip]\033[0m" if i in skipped else "\033[32m[run]\033[0m"
         )
-        print(f"  \033[33m{i}\033[0m. $ {cmd} {status}")
+        if isinstance(item, tuple):
+            tool_type, _, value, _ = item
+            label = "⚙ bash" if tool_type == "bash" else "📄 read"
+            display = f"$ {value}" if tool_type == "bash" else value
+        else:
+            label = "⚙ bash"
+            display = f"$ {item}"
+        print(f"  \033[33m{i}\033[0m. {label} {display} {status}")
     print()
     print(
         f"\033[36m[Enter=run-selected r=regen "
         f"1-{len(scout_cmds)}=toggle Esc=cancel]\033[0m"
     )
     return get_single_key()
-
-
-def _display_scout_output(cmd, result, elapsed):
-    status = (
-        "\033[32m✓\033[0m" if result.returncode == 0 else "\033[31m✗\033[0m"
-    )
-    output = (result.stdout + result.stderr).strip()
-    line_count = output.count("\n") + 1 if output else 0
-    print(f"  {status} \033[90m{elapsed}s\033[0m", end="")
-    if line_count:
-        print(f"  \033[90m({line_count} lines)\033[0m")
-    else:
-        print()
-    if output:
-        for line in output.split("\n")[:5]:
-            print(f"     \033[90m{line[:100]}\033[0m")
-    return output
 
 
 def get_scout_cmd(user_input, cwd, rejected=""):
@@ -420,30 +494,86 @@ def get_scout_cmd(user_input, cwd, rejected=""):
         return None
 
 
-def scout_and_get_commands(user_input, cwd, store):
+def _fallback_from_executed(executed, user_input, cwd, store):
+    """Generate commands from executed scout output when tool-call flow fails."""
     shell_ctx = ensure_shell_context()
+    output_text = "\n\n".join(o for _, o in executed)
 
-    # Step 1: Get scout command list
-    prompt = PROMPT_SCOUT_LIST.format(
-        shell_context=shell_ctx, cwd=cwd, user_input=user_input
+    gen_prompt = (
+        f"You are a shell command translator. "
+        f"Generate exactly 3 different command options.\n\n"
+        f"{shell_ctx}\nCurrent directory: {cwd}\n\n"
+        f"Scout results:\n{output_text}\n\n"
+        f"Format: 1) <command> // <brief description>\n"
+        f"Request: {user_input}"
     )
 
     try:
-        result = _call_api([{"role": "user", "content": prompt}])
-        scout_cmds = [
-            c.strip()
-            for c in result.strip().split("\n")
-            if c.strip() and "sudo" not in c.strip()
-        ]
-        scout_cmds = [
-            c for c in scout_cmds if not c.startswith("```") and c != ""
-        ]
-        scout_cmds = scout_cmds[:5]
+        return _call_api([{"role": "user", "content": gen_prompt}])
     except Exception:
-        scout_cmds = ["ls -la", "pwd"]
+        return get_commands(user_input, cwd, store, "")
+
+
+def scout_and_get_commands(user_input, cwd, store):
+    shell_ctx = ensure_shell_context()
+
+    system_prompt = (
+        f"You are scouting a shell environment.\n"
+        f"{shell_ctx}\nCurrent directory: {cwd}\n\n"
+        f"Use the available tools to gather context for this request.\n"
+        f"All commands must be purely observational / readonly — never change\n"
+        f"files, permissions, processes, or system state.\n\n"
+        f"Request: {user_input}"
+    )
+    messages = [{"role": "system", "content": system_prompt}]
+
+    # Step 1: Get model to propose tool calls
+    try:
+        msg = _call_api_tools(messages, SCOUT_TOOLS)
+    except Exception:
+        return [Command(cmd="echo 'scout error')")]
+
+    tool_calls = msg.tool_calls or []
+    if not tool_calls:
+        # Fallback: model returned text instead of tool calls
+        if msg.content:
+            scout_cmds = [
+                c.strip()
+                for c in msg.content.strip().split("\n")
+                if c.strip() and "sudo" not in c.strip()
+            ]
+            scout_cmds = [
+                c for c in scout_cmds
+                if not c.startswith("```") and c != ""
+            ][:5]
+        else:
+            scout_cmds = ["ls -la", "pwd"]
+        scout_cmds = [
+            ("bash", "bash", c, f"fb_{i}") for i, c in enumerate(scout_cmds)
+        ]
+    else:
+        scout_cmds = []
+        for tc in tool_calls:
+            fn = tc.function
+            if fn.name == "bash":
+                try:
+                    args = json.loads(fn.arguments)
+                    cmd = args.get("command", "").strip()
+                except Exception:
+                    continue
+                if cmd and not _is_blocked_scout(cmd) and "sudo" not in cmd:
+                    scout_cmds.append(("bash", fn.name, cmd, tc.id))
+            elif fn.name == "read":
+                try:
+                    args = json.loads(fn.arguments)
+                    path = args.get("path", "").strip()
+                except Exception:
+                    continue
+                if path:
+                    scout_cmds.append(("read", fn.name, path, tc.id))
 
     if not scout_cmds:
-        scout_cmds = ["ls -la", "pwd"]
+        return [Command(cmd="echo 'no scout commands'")]
 
     # Step 1.5: Preview and review
     skipped = set()
@@ -453,18 +583,29 @@ def scout_and_get_commands(user_input, cwd, store):
             break
         elif key == "r":
             try:
-                result = _call_api([{"role": "user", "content": prompt}])
-                scout_cmds = [
-                    c.strip()
-                    for c in result.strip().split("\n")
-                    if c.strip() and "sudo" not in c.strip()
-                ]
-                scout_cmds = [
-                    c for c in scout_cmds
-                    if not c.startswith("```") and c != ""
-                ]
-                scout_cmds = scout_cmds[:5]
-                skipped = set()
+                msg = _call_api_tools(messages, SCOUT_TOOLS)
+                # Re-parse tool calls... (same logic as above, simplified)
+                tcs = msg.tool_calls or []
+                if tcs:
+                    new_cmds = []
+                    for tc in tcs:
+                        fn = tc.function
+                        if fn.name in ("bash", "read"):
+                            try:
+                                args = json.loads(fn.arguments)
+                                val = args.get(
+                                    "command" if fn.name == "bash" else "path",
+                                    "",
+                                ).strip()
+                                if val:
+                                    new_cmds.append(
+                                        (fn.name, fn.name, val, tc.id)
+                                    )
+                            except Exception:
+                                pass
+                    if new_cmds:
+                        scout_cmds = new_cmds
+                        skipped = set()
             except Exception:
                 pass
         elif key == "\x1b":
@@ -478,19 +619,22 @@ def scout_and_get_commands(user_input, cwd, store):
                 else:
                     skipped.add(idx)
 
-    # Step 2: Run scouts with approval
-    scout_results = []
+    # Step 2: Execute approved scouts
+    executed = []
 
-    for i, cmd in enumerate(scout_cmds, 1):
-        if _is_blocked_scout(cmd):
-            print(f"  {i}. ⚙ bash $ {cmd} \033[31m[blocked]\033[0m")
-            continue
+    for i, (tool_type, tool_name, value, tc_id) in enumerate(scout_cmds, 1):
+        label = "⚙ bash" if tool_type == "bash" else "📄 read"
+        display = f"$ {value}" if tool_type == "bash" else value
 
         if i in skipped:
-            print(f"  {i}. ⚙ bash $ {cmd} \033[90m[skipped]\033[0m")
+            print(f"  {i}. {label} {display} \033[90m[skipped]\033[0m")
             continue
 
-        print(f"  {i}. ⚙ bash $ {cmd}")
+        if tool_type == "bash" and _is_blocked_scout(value):
+            print(f"  {i}. {label} {display} \033[31m[blocked]\033[0m")
+            continue
+
+        print(f"  {i}. {label} {display}")
         print(
             "  \033[36m[Enter=run s=skip r=regen Esc=cancel]\033[0m",
             end="", flush=True,
@@ -506,87 +650,80 @@ def scout_and_get_commands(user_input, cwd, store):
             continue
         elif key in ("r", "R"):
             print("  \033[90m[regenerating...]\033[0m")
-            new_cmd = get_scout_cmd(user_input, cwd, cmd)
-            if new_cmd and new_cmd not in scout_cmds:
-                scout_cmds.insert(i, new_cmd)
+            if tool_type == "bash":
+                new_cmd = get_scout_cmd(user_input, cwd, value)
+                if new_cmd and not _is_blocked_scout(new_cmd):
+                    scout_cmds.insert(i, ("bash", "bash", new_cmd, tc_id))
             continue
         elif key in ("\r", "\n"):
             start = time.time()
-            try:
-                result = subprocess.run(
-                    cmd, shell=True, capture_output=True,
-                    text=True, timeout=10,
-                )
-                elapsed = int(time.time() - start)
-                output = _display_scout_output(cmd, result, elapsed)
+            args = (
+                {"command": value}
+                if tool_type == "bash"
+                else {"path": value}
+            )
+            output = _execute_tool(tool_type, args, cwd)
+            elapsed = int(time.time() - start)
 
-                if result.returncode != 0:
-                    print(
-                        "  \033[36m[r=regen s=skip]\033[0m",
-                        end="", flush=True,
-                    )
-                    retry = get_single_key()
-                    print()
-                    if retry in ("r", "R"):
-                        print("  \033[90m[regenerating...]\033[0m")
-                        new_cmd = get_scout_cmd(user_input, cwd, cmd)
-                        if new_cmd:
-                            scout_cmds.insert(i, new_cmd)
-                        continue
-
-                full_output = result.stdout + result.stderr
-                scout_results.append(
-                    f"$ {cmd}\n{full_output[:500]}"
-                )
-            except subprocess.TimeoutExpired:
-                print(f"  \033[31m✗ (timeout)\033[0m")
-                print(
-                    "  \033[36m[r=regen s=skip]\033[0m",
-                    end="", flush=True,
-                )
-                retry = get_single_key()
+            # Display result
+            status = "\033[32m✓\033[0m" if not output.startswith(
+                "[blocked]"
+            ) and not output.startswith("(error") and not output.startswith(
+                "(timeout"
+            ) and not output.startswith(
+                "(permission"
+            ) and not output.startswith(
+                "(file not found"
+            ) else "\033[31m✗\033[0m"
+            line_count = output.count("\n") + 1 if output else 0
+            print(f"  {status} \033[90m{elapsed}s\033[0m", end="")
+            if line_count:
+                print(f"  \033[90m({line_count} lines)\033[0m")
+            else:
                 print()
-                if retry in ("r", "R"):
-                    print("  \033[90m[regenerating...]\033[0m")
-                    new_cmd = get_scout_cmd(user_input, cwd, cmd)
-                    if new_cmd:
-                        scout_cmds.insert(i, new_cmd)
-                    continue
+            if output:
+                for line in output.split("\n")[:5]:
+                    print(f"     \033[90m{line[:100]}\033[0m")
+
+            executed.append((tc_id, output))
         else:
             print("  \033[90m[skipped]\033[0m")
             continue
 
-    # Step 3: Generate commands with scout context
-    scout_context = "\n\n".join(scout_results)
+    if not executed:
+        return [Command(cmd="echo 'no scouts executed'")]
 
-    gen_prompt = f"""You are a shell command translator. Generate exactly 3 different command options for the user's request.
+    # Step 3: Feed results back and generate final commands
+    if tool_calls:
+        messages.append(msg)
+        for tc_id, output in executed:
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc_id,
+                "content": output,
+            })
+        messages.append({
+            "role": "user",
+            "content": (
+                f"Now generate exactly 3 different shell commands for: {user_input}\n"
+                f"Format: 1) <command> // <brief description>"
+            ),
+        })
+        try:
+            result = _call_api(messages, max_tokens=256)
+        except Exception:
+            return _fallback_from_executed(executed, user_input, cwd, store)
+    else:
+        # Fallback: generate from collected output without tool messages
+        result = _fallback_from_executed(executed, user_input, cwd, store)
+        if isinstance(result, list):
+            return result
+        # result is string, parse below
 
-{shell_ctx}
-Current directory: {cwd}
-
-Scout results:
-{scout_context}
-
-Rules:
-- Output exactly 3 commands, one per line, numbered 1-3
-- Include a very brief description after // (max 5 words)
-- Each command should be a different approach
-- No markdown, no backticks
-- Format: 1) <command> // <5 word max>
-- Prefer simple, common commands
-
-User request: {user_input}"""
-
-    try:
-        result = _call_api([{"role": "user", "content": gen_prompt}])
-        commands = parse_multi_commands(result)
-        if len(commands) >= 3:
-            return commands[:3]
-        single, _ = get_command(user_input, cwd, store, "")
-        if single:
-            return [Command(cmd=single)]
-        return [Command(cmd="echo 'no command generated'")]
-    except TimeoutError:
-        raise
-    except Exception:
-        raise
+    commands = parse_multi_commands(result)
+    if len(commands) >= 3:
+        return commands[:3]
+    single, _ = get_command(user_input, cwd, store, "")
+    if single:
+        return [Command(cmd=single)]
+    return [Command(cmd="echo 'no command generated'")]
