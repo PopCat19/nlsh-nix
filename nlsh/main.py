@@ -367,6 +367,9 @@ def main():
 
     if not config.is_configured:
         setup_wizard(config)
+    if not config.is_configured:
+        print("\033[31mSetup incomplete, exiting.\033[0m")
+        sys.exit(1)
     config.apply_to_env()
 
     from . import VERSION, DATE

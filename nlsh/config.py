@@ -9,6 +9,8 @@
 import os
 from dataclasses import dataclass
 
+from .ui import raw_input, secret_input
+
 CONFIG_DIR = os.path.expanduser("~/.config/nlsh")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "config")
 
@@ -67,20 +69,20 @@ def setup_wizard(config):
     print(f"\n\033[36mOpenAI-compatible API setup\033[0m\n")
 
     while not config.base_url:
-        base_url = input("\033[33mBase URL: \033[0m").strip()
-        if base_url:
-            config.base_url = base_url
-        else:
-            print("Base URL required.")
+        base_url = raw_input("\033[33mBase URL: \033[0m")
+        if not base_url:
+            print("\033[31m✗ Cancelled\033[0m\n")
+            return
+        config.base_url = base_url
 
     while not config.model:
-        model = input("\033[33mModel: \033[0m").strip()
-        if model:
-            config.model = model
-        else:
-            print("Model required.")
+        model = raw_input("\033[33mModel: \033[0m")
+        if not model:
+            print("\033[31m✗ Cancelled\033[0m\n")
+            return
+        config.model = model
 
-    api_key = input("\033[33mAPI key (enter to skip): \033[0m").strip()
+    api_key = secret_input("\033[33mAPI key (enter to skip): \033[0m")
     if api_key:
         config.api_key = api_key
 
@@ -110,37 +112,44 @@ def config_menu(config):
         print("  \033[33mc\033[0m Cancel")
         print()
 
-        choice = input("\033[33mSelect: \033[0m").strip().lower()
+        choice = raw_input("\033[33mSelect: \033[0m").strip().lower()
 
-        if choice == "1":
-            current = config.base_url
-            val = input(f"\033[33mBase URL [{current}]: \033[0m").strip()
-            if val:
-                config.base_url = val
-                print("\033[36m(staged)\033[0m")
-        elif choice == "2":
-            current = config.model
-            val = input(f"\033[33mModel [{current}]: \033[0m").strip()
-            if val:
-                config.model = val
-                print("\033[36m(staged)\033[0m")
-        elif choice == "3":
-            val = input("\033[33mAPI key: \033[0m").strip()
-            if val:
-                config.api_key = val
-                print("\033[36m(staged)\033[0m")
-            elif input("\033[33mClear API key? [y/N] \033[0m").strip().lower() == "y":
-                config.api_key = ""
-                print("\033[36m(staged - cleared)\033[0m")
-        elif choice == "s":
-            config.save()
-            print("\033[32m✓ Saved\033[0m\n")
-            break
-        elif choice == "c":
+        if not choice or choice == "c":
             config.base_url = original.base_url
             config.model = original.model
             config.api_key = original.api_key
             print("\033[31m✗ Cancelled\033[0m\n")
+            break
+
+        if choice == "1":
+            current = config.base_url
+            val = raw_input(f"\033[33mBase URL [{current}]: \033[0m").strip()
+            if not val:
+                continue
+            config.base_url = val
+            print("\033[36m(staged)\033[0m")
+        elif choice == "2":
+            current = config.model
+            val = raw_input(f"\033[33mModel [{current}]: \033[0m").strip()
+            if not val:
+                continue
+            config.model = val
+            print("\033[36m(staged)\033[0m")
+        elif choice == "3":
+            val = secret_input("\033[33mAPI key: \033[0m")
+            if val:
+                config.api_key = val
+                print("\033[36m(staged)\033[0m")
+            else:
+                clear_prompt = raw_input("\033[33mClear API key? [y/N] \033[0m")
+                if not clear_prompt:
+                    continue
+                if clear_prompt.strip().lower() == "y":
+                    config.api_key = ""
+                    print("\033[36m(staged - cleared)\033[0m")
+        elif choice == "s":
+            config.save()
+            print("\033[32m✓ Saved\033[0m\n")
             break
         else:
             print("\033[31mInvalid option\033[0m")

@@ -111,6 +111,44 @@ def raw_input(prompt: str) -> str:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
+def secret_input(prompt: str) -> str:
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    buffer = []
+
+    try:
+        tty.setraw(fd)
+        while True:
+            ch = sys.stdin.read(1)
+
+            if ch == "\x1b":
+                while select.select([sys.stdin], [], [], 0.03)[0]:
+                    ch += sys.stdin.read(1)
+                if ch == "\x1b":
+                    print()
+                    return ""
+            elif ch in ("\r", "\n"):
+                print()
+                return "".join(buffer)
+            elif ch in ("\x7f", "\x08"):
+                if buffer:
+                    buffer.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+            elif ch == "\x03":
+                print()
+                return ""
+            elif ch.isprintable():
+                buffer.append(ch)
+                sys.stdout.write("*")
+                sys.stdout.flush()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 class AwaitIndicator:
     def __init__(self, timeout: int = TIMEOUT):
         self.timeout = timeout
