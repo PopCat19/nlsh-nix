@@ -372,13 +372,15 @@ def main():
         setup_api_key()
     
     from . import VERSION, DATE
-    print(f"\033[1mnlsh\033[0m {VERSION} ({DATE}) - model: \033[36m{os.environ.get('NLSH_MODEL', 'unknown')}\033[0m\n")
-    show_help()
+    print(f"\033[1mnlsh\033[0m {VERSION} ({DATE}) - model: \033[36m{os.environ.get('NLSH_MODEL', 'unknown')}\033[0m")
     
     init_client()
     
     args = ' '.join(sys.argv[1:])
     if args:
+        print()
         run_oneshot(args)
     else:
+        print("\n")
+        show_help()
         run_repl()
