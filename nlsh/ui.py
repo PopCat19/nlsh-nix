@@ -30,6 +30,41 @@ def get_single_key():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
 
+def raw_input(prompt: str) -> str:
+    """Read line with ESC=cancel, Backspace=delete, Enter=submit."""
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    buffer = []
+    
+    try:
+        tty.setraw(fd)
+        while True:
+            ch = sys.stdin.read(1)
+            
+            if ch == '\x1b':  # ESC
+                print()
+                return ""
+            elif ch == '\r' or ch == '\n':  # Enter
+                print()
+                return ''.join(buffer)
+            elif ch == '\x7f' or ch == '\x08':  # Backspace
+                if buffer:
+                    buffer.pop()
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+            elif ch == '\x03':  # Ctrl+C
+                print()
+                return ""
+            elif ch.isprintable():
+                buffer.append(ch)
+                sys.stdout.write(ch)
+                sys.stdout.flush()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
 class AwaitIndicator:
     def __init__(self, timeout: int = TIMEOUT):
         self.timeout = timeout

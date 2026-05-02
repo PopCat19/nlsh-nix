@@ -14,7 +14,7 @@ import subprocess
 from .config import load_config, is_configured, setup_api_key, config_menu, is_loaded_from_config
 from .llm import init_client, reinit_client, get_command
 from .history import add_to_history, reset_regen_history, add_regen
-from .ui import get_single_key, show_help, show_config
+from .ui import get_single_key, show_help, show_config, raw_input
 
 def exit_handler(sig, frame):
     print()
@@ -38,11 +38,8 @@ def is_natural_language(text: str) -> bool:
     return not any(text.startswith(s) for s in shell_starters)
 
 def safe_input(prompt: str) -> str:
-    """Input that handles Ctrl+C gracefully."""
-    try:
-        return input(prompt).strip()
-    except (InterruptedError, KeyboardInterrupt, EOFError):
-        return ""
+    """Input that handles ESC/Ctrl+C gracefully."""
+    return raw_input(prompt)
 
 def prompt_clarify(question: str, options: dict) -> str:
     """Show clarification question with options and get user response."""
