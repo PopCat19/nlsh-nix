@@ -162,12 +162,18 @@ Rules:
 
 User request: {user_input}"""
 
-    response = client.chat.completions.create(
-        model=os.environ["NLSH_MODEL"],
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=256,
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model=os.environ["NLSH_MODEL"],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+            timeout=30.0,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+            raise TimeoutError("Request timed out")
+        raise
 
 def is_natural_language(text: str) -> bool:
     if text.startswith("!"):
@@ -245,22 +251,48 @@ def main():
                 add_to_history(user_input, result.stdout + result.stderr)
                 continue
 
-            command = get_command(user_input, cwd)
-            confirm = input(f"\033[33m→ {command}\033[0m [Enter] ")
+            try:
+                command = get_command(user_input, cwd)
+            except TimeoutError:
+                print("\033[31mtimed out\033[0m")
+                continue
+            except Exception as e:
+                print(f"\033[31merror: {e}\033[0m")
+                continue
 
-            if confirm == "":
-                if command.startswith("cd "):
-                    path = os.path.expanduser(command[3:].strip())
+            while True:
+                confirm = input(f"\033[33m→ {command}\033[0m [Enter=run r=regen s=skip q=quit]: ")
+                
+                if confirm == "":
+                    if command.startswith("cd "):
+                        path = os.path.expanduser(command[3:].strip())
+                        try:
+                            os.chdir(path)
+                        except Exception as e:
+                            print(f"cd: {e}")
+                    else:
+                        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                        print(result.stdout, end="")
+                        if result.stderr:
+                            print(result.stderr, end="")
+                        add_to_history(command, result.stdout + result.stderr)
+                    break
+                elif confirm == "r":
                     try:
-                        os.chdir(path)
+                        command = get_command(user_input, cwd)
+                    except TimeoutError:
+                        print("\033[31mtimed out - press r to retry\033[0m")
+                        continue
                     except Exception as e:
-                        print(f"cd: {e}")
+                        print(f"\033[31merror: {e}\033[0m")
+                        continue
+                elif confirm == "s":
+                    break
+                elif confirm == "q":
+                    print("\033[36mo7\033[0m")
+                    sys.exit(0)
                 else:
-                    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-                    print(result.stdout, end="")
-                    if result.stderr:
-                        print(result.stderr, end="")
-                    add_to_history(command, result.stdout + result.stderr)
+                    break
 
         except EOFError:
             print("\n\033[36mo7\033[0m")
