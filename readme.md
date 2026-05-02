@@ -50,17 +50,40 @@ Press `s` to let the model explore your environment first:
 [Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
 s
 Scouting...
-  $ ls -la
-  $ find . -maxdepth 2 -type f
-  $ du -sh *
+  1. $ which nixos-rebuild
+  [Enter=run s=skip r=regen Esc=cancel]
+  ✓ 0s
+  
+  2. $ ls -la /etc/nixos
+  [Enter=run s=skip r=regen Esc=cancel]
+  ✓ 0s
+  
+  3. $ find /home -name "*.nix"
+  [Enter=run s=skip r=regen Esc=cancel]
+  r
+  [regenerating...]
+  4. $ cat /etc/nixos/configuration.nix
+  [Enter=run s=skip r=regen Esc=cancel]
+  ✗ 1s
+  [r=regen s=skip]
+  s
+  [skipped]
 
 Generated commands:
-  1) Find largest files
-  ↳ find . -type f -exec du -h {} + | sort -rh | head
+  1) Rebuild with upgrade
+  ↳ sudo nixos-rebuild switch --upgrade
   ...
 ```
 
-Scout runs exploratory commands (no sudo) to gather context before proposing.
+Scout commands run with approval:
+- `Enter` - Run the scout command
+- `s` - Skip this command
+- `r` - Generate alternative scout command
+- `Esc` - Cancel scout mode
+
+On failure, choose `r=regen` or `s=skip`. Commands blocked if dangerous (`find /`, `rm`, `sudo`, etc.).
+
+Scout runs exploratory commands to gather context before proposing final commands.
 
 ### Confirmation
 
