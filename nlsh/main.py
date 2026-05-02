@@ -95,13 +95,28 @@ def show_ask_options():
 def confirm_run(cmd: str) -> bool:
     """Ask for confirmation before running, warn if sudo."""
     if 'sudo' in cmd:
-        print(f"\033[31m⚠ sudo detected: {cmd}\033[0m")
-        print("\033[36m[Enter=confirm Esc=cancel]\033[0m")
+        print(f"\033[31m⚠ sudo: {cmd}\033[0m")
+        print("\033[36m[Enter=run c=copy Esc=cancel]\033[0m")
     else:
         print(f"\033[33m→ {cmd}\033[0m")
-        print("\033[36m[Enter=confirm Esc=cancel]\033[0m")
+        print("\033[36m[Enter=run c=copy Esc=cancel]\033[0m")
     
     key = get_single_key()
+    if key == 'c':
+        # Try wl-copy first (Wayland), then xclip (X11)
+        import shutil
+        if shutil.which('wl-copy'):
+            os.system(f"echo '{cmd}' | wl-copy")
+            print("\033[32m✓ copied to clipboard\033[0m")
+        elif shutil.which('xclip'):
+            os.system(f"echo '{cmd}' | xclip -selection clipboard")
+            print("\033[32m✓ copied to clipboard\033[0m")
+        elif shutil.which('xsel'):
+            os.system(f"echo '{cmd}' | xsel --clipboard --input")
+            print("\033[32m✓ copied to clipboard\033[0m")
+        else:
+            print("\033[31mno clipboard tool found (wl-copy/xclip/xsel)\033[0m")
+        return False
     return key == '\r' or key == '\n'
 
 def show_gen_options(commands: list):
