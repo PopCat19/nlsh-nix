@@ -20,12 +20,12 @@ def get_shell_context():
         try:
             result = subprocess.run(
                 ["fish", "-c", "abbr --show"],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             if result.returncode == 0 and result.stdout.strip():
-                abbrs = [
-                    l for l in result.stdout.strip().split("\n")[:10] if l
-                ]
+                abbrs = [l for l in result.stdout.strip().split("\n")[:10] if l]
                 if abbrs:
                     lines.append("Fish abbreviations:")
                     lines.extend(abbrs[:10])
@@ -35,7 +35,9 @@ def get_shell_context():
         try:
             result = subprocess.run(
                 [shell, "-ic", "alias"],
-                capture_output=True, text=True, timeout=2,
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             if result.returncode == 0 and result.stdout.strip():
                 aliases = [

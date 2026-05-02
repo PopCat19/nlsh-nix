@@ -68,7 +68,11 @@ def _execute_tool(tool_name, args, cwd):
             return f"[blocked] {cmd}"
         try:
             result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=10,
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             output = (result.stdout + result.stderr).strip()
             return output[:2000] if output else "(no output)"

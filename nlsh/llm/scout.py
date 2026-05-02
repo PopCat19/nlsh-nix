@@ -24,9 +24,7 @@ from .tools import SCOUT_TOOLS, _execute_tool
 def _show_scout_preview(scout_cmds, skipped):
     print("\033[36mProposed scout commands:\033[0m")
     for i, item in enumerate(scout_cmds, 1):
-        status = (
-            "\033[31m[skip]\033[0m" if i in skipped else "\033[32m[run]\033[0m"
-        )
+        status = "\033[31m[skip]\033[0m" if i in skipped else "\033[32m[run]\033[0m"
         if isinstance(item, tuple):
             tool_type, _, value, _ = item
             label = "⚙ bash" if tool_type == "bash" else "📄 read"
@@ -112,15 +110,12 @@ def scout_and_get_commands(user_input, cwd, store):
                 for c in msg.content.strip().split("\n")
                 if c.strip() and "sudo" not in c.strip()
             ]
-            scout_cmds = [
-                c for c in scout_cmds
-                if not c.startswith("```") and c != ""
-            ][:5]
+            scout_cmds = [c for c in scout_cmds if not c.startswith("```") and c != ""][
+                :5
+            ]
         else:
             scout_cmds = ["ls -la", "pwd"]
-        scout_cmds = [
-            ("bash", "bash", c, f"fb_{i}") for i, c in enumerate(scout_cmds)
-        ]
+        scout_cmds = [("bash", "bash", c, f"fb_{i}") for i, c in enumerate(scout_cmds)]
     else:
         scout_cmds = []
         for tc in tool_calls:
@@ -167,9 +162,7 @@ def scout_and_get_commands(user_input, cwd, store):
                                     "",
                                 ).strip()
                                 if val:
-                                    new_cmds.append(
-                                        (fn.name, fn.name, val, tc.id)
-                                    )
+                                    new_cmds.append((fn.name, fn.name, val, tc.id))
                             except Exception:
                                 pass
                     if new_cmds:
@@ -206,7 +199,8 @@ def scout_and_get_commands(user_input, cwd, store):
         print(f"  {i}. {label} {display}")
         print(
             "  \033[36m[Enter=run s=skip r=regen Esc=cancel]\033[0m",
-            end="", flush=True,
+            end="",
+            flush=True,
         )
         key = get_single_key()
         print()
@@ -226,24 +220,20 @@ def scout_and_get_commands(user_input, cwd, store):
             continue
         elif key in ("\r", "\n"):
             start = time.time()
-            args = (
-                {"command": value}
-                if tool_type == "bash"
-                else {"path": value}
-            )
+            args = {"command": value} if tool_type == "bash" else {"path": value}
             output = _execute_tool(tool_type, args, cwd)
             elapsed = int(time.time() - start)
 
             # Display result
-            status = "\033[32m✓\033[0m" if not output.startswith(
-                "[blocked]"
-            ) and not output.startswith("(error") and not output.startswith(
-                "(timeout"
-            ) and not output.startswith(
-                "(permission"
-            ) and not output.startswith(
-                "(file not found"
-            ) else "\033[31m✗\033[0m"
+            status = (
+                "\033[32m✓\033[0m"
+                if not output.startswith("[blocked]")
+                and not output.startswith("(error")
+                and not output.startswith("(timeout")
+                and not output.startswith("(permission")
+                and not output.startswith("(file not found")
+                else "\033[31m✗\033[0m"
+            )
             line_count = output.count("\n") + 1 if output else 0
             print(f"  {status} \033[90m{elapsed}s\033[0m", end="")
             if line_count:
@@ -266,19 +256,23 @@ def scout_and_get_commands(user_input, cwd, store):
     if tool_calls:
         messages.append(msg)
         for tc_id, output in executed:
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc_id,
-                "content": output,
-            })
-        messages.append({
-            "role": "user",
-            "content": (
-                f"Now generate exactly 3 different shell commands for: "
-                f"{user_input}\n"
-                f"Format: 1) <command> // <brief description>"
-            ),
-        })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": output,
+                }
+            )
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    f"Now generate exactly 3 different shell commands for: "
+                    f"{user_input}\n"
+                    f"Format: 1) <command> // <brief description>"
+                ),
+            }
+        )
         try:
             result = _call_api(messages, max_tokens=256)
         except Exception:

@@ -20,13 +20,30 @@ except ImportError:
 
 from .config import Config, setup_wizard, config_menu
 from .history import HistoryStore
-from .llm import init_client, reinit_client, get_command, get_commands, get_shell_history, scout_and_get_commands
-from .ui import get_single_key, raw_input, show_help, show_config, show_gen_options, show_ask_options, prompt_clarify, show_history_approval
+from .llm import (
+    init_client,
+    reinit_client,
+    get_command,
+    get_commands,
+    get_shell_history,
+    scout_and_get_commands,
+)
+from .ui import (
+    get_single_key,
+    raw_input,
+    show_help,
+    show_config,
+    show_gen_options,
+    show_ask_options,
+    prompt_clarify,
+    show_history_approval,
+)
 from .util import copy_to_clipboard, clipboard_read, edit_in_editor
 from .types import Command
 
 
 # --- Command Execution ---
+
 
 def run_cmd(cmd, store):
     print(f"\033[36m[running] (0s)\033[0m", end="\r")
@@ -46,8 +63,11 @@ def run_cmd(cmd, store):
     ret = 1
     try:
         proc = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, text=True,
+            cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
         )
         for line in proc.stdout:
             sys.stdout.write(line)
@@ -69,20 +89,79 @@ def run_cmd(cmd, store):
 
 # --- Input Classification ---
 
+
 def is_natural_language(text: str) -> bool:
     if text.startswith("!"):
         return False
     shell_commands = [
-        "ls", "pwd", "clear", "exit", "quit", "whoami", "date", "cal",
-        "top", "htop", "history", "which", "man", "touch", "head", "tail",
-        "grep", "find", "sort", "wc", "diff", "tar", "zip", "unzip",
+        "ls",
+        "pwd",
+        "clear",
+        "exit",
+        "quit",
+        "whoami",
+        "date",
+        "cal",
+        "top",
+        "htop",
+        "history",
+        "which",
+        "man",
+        "touch",
+        "head",
+        "tail",
+        "grep",
+        "find",
+        "sort",
+        "wc",
+        "diff",
+        "tar",
+        "zip",
+        "unzip",
     ]
     shell_starters = [
-        "cd ", "ls ", "echo ", "cat ", "mkdir ", "rm ", "cp ", "mv ",
-        "git ", "npm ", "node ", "npx ", "python", "pip ", "brew ", "curl ",
-        "wget ", "chmod ", "chown ", "sudo ", "vi ", "vim ", "nano ", "code ",
-        "open ", "export ", "source ", "docker ", "kubectl ", "aws ", "gcloud ",
-        "nix ", "nixos-", "home-manager ", "./", "/", "~", "$", ">", ">>", "|", "&&",
+        "cd ",
+        "ls ",
+        "echo ",
+        "cat ",
+        "mkdir ",
+        "rm ",
+        "cp ",
+        "mv ",
+        "git ",
+        "npm ",
+        "node ",
+        "npx ",
+        "python",
+        "pip ",
+        "brew ",
+        "curl ",
+        "wget ",
+        "chmod ",
+        "chown ",
+        "sudo ",
+        "vi ",
+        "vim ",
+        "nano ",
+        "code ",
+        "open ",
+        "export ",
+        "source ",
+        "docker ",
+        "kubectl ",
+        "aws ",
+        "gcloud ",
+        "nix ",
+        "nixos-",
+        "home-manager ",
+        "./",
+        "/",
+        "~",
+        "$",
+        ">",
+        ">>",
+        "|",
+        "&&",
     ]
     if text in shell_commands:
         return False
@@ -90,6 +169,7 @@ def is_natural_language(text: str) -> bool:
 
 
 # --- Confirmation ---
+
 
 def confirm_run(cmd: str) -> bool:
     if "sudo" in cmd:
@@ -111,23 +191,24 @@ def confirm_run(cmd: str) -> bool:
 
 # --- Signal Handling ---
 
+
 def exit_handler(sig, frame):
     print()
     raise InterruptedError()
+
 
 signal.signal(signal.SIGINT, exit_handler)
 
 
 # --- Ask Menu Handler ---
 
+
 def _handle_ask(choice, clarification, user_input):
     if choice == "0":
         custom = raw_input("\033[33mDescribe: \033[0m")
         if not custom:
             return user_input, clarification, False
-        clarification = (
-            f"{clarification} {custom}".strip() if clarification else custom
-        )
+        clarification = f"{clarification} {custom}".strip() if clarification else custom
         return user_input, clarification, False
     elif choice == "1":
         clarify = raw_input("\033[33mClarify: \033[0m")
@@ -157,9 +238,15 @@ def _handle_ask(choice, clarification, user_input):
 
 # --- Shared Command Selection Loop ---
 
+
 def _command_selection(
-    user_input, cwd, commands, store, config,
-    clarification="", regen_count=0,
+    user_input,
+    cwd,
+    commands,
+    store,
+    config,
+    clarification="",
+    regen_count=0,
 ):
     while True:
         show_gen_options(commands)
@@ -212,7 +299,9 @@ def _command_selection(
             if choice == "\x1b":
                 continue
             user_input, clarification, reset = _handle_ask(
-                choice, clarification, user_input,
+                choice,
+                clarification,
+                user_input,
             )
             if reset:
                 store.reset_regen()
@@ -260,12 +349,14 @@ def _command_selection(
                         print("\033[90mclipboard empty\033[0m")
                 elif action == "send":
                     count = term_hist.count("\n") + 1
-                    print(
-                        f"\033[36msharing {count} history entries...\033[0m"
-                    )
+                    print(f"\033[36msharing {count} history entries...\033[0m")
                     try:
                         commands = get_commands(
-                            user_input, cwd, store, clarification, term_hist,
+                            user_input,
+                            cwd,
+                            store,
+                            clarification,
+                            term_hist,
                         )
                         store.add_regen(commands[0].cmd, clarification)
                         regen_count += 1
@@ -286,6 +377,7 @@ def _command_selection(
 
 # --- One-shot Mode ---
 
+
 def run_oneshot(args, store, config):
     cwd = os.getcwd()
     store.reset_regen()
@@ -305,6 +397,7 @@ def run_oneshot(args, store, config):
 
 
 # --- REPL Mode ---
+
 
 def run_repl(store, config):
     while True:
@@ -399,6 +492,7 @@ def run_repl(store, config):
 
 # --- Entry Point ---
 
+
 def main():
     config = Config.load()
 
@@ -410,6 +504,7 @@ def main():
     config.apply_to_env()
 
     from . import VERSION, DATE
+
     print(
         f"\033[1mnlsh\033[0m {VERSION} ({DATE}) - "
         f"model: \033[36m{config.model or 'unknown'}\033[0m"

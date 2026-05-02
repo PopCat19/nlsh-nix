@@ -23,7 +23,10 @@ def copy_to_clipboard(text: str) -> bool:
                 args = ["--clipboard", "--input"]
             try:
                 p = subprocess.run(
-                    [tool] + args, input=text, text=True, capture_output=True,
+                    [tool] + args,
+                    input=text,
+                    text=True,
+                    capture_output=True,
                 )
                 if p.returncode == 0:
                     return True
@@ -42,7 +45,9 @@ def clipboard_read() -> str:
                 args = ["--clipboard", "--output"]
             try:
                 result = subprocess.run(
-                    [tool] + args, capture_output=True, text=True,
+                    [tool] + args,
+                    capture_output=True,
+                    text=True,
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     return result.stdout.strip()
@@ -54,7 +59,9 @@ def clipboard_read() -> str:
 def edit_in_editor(text: str) -> str:
     editor_cmd = os.environ.get("EDITOR", "nano")
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False,
+        mode="w",
+        suffix=".txt",
+        delete=False,
     ) as f:
         f.write(text)
         tmp = f.name

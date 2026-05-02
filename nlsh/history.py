@@ -6,6 +6,7 @@
 # - Provides HistoryStore class for tracking commands and regens
 # - Formats history for LLM context
 
+
 class HistoryStore:
     def __init__(self, max_entries=10, max_chars=4000):
         self._commands = []
@@ -14,21 +15,25 @@ class HistoryStore:
         self.max_chars = max_chars
 
     def add_command(self, command, output=""):
-        self._commands.append({
-            "command": command,
-            "output": output[:500] if output else "",
-        })
+        self._commands.append(
+            {
+                "command": command,
+                "output": output[:500] if output else "",
+            }
+        )
         while len(self._commands) > self.max_entries:
             self._commands.pop(0)
         while self._context_size > self.max_chars and len(self._commands) > 1:
             self._commands.pop(0)
 
     def add_regen(self, command, clarification=""):
-        self._regens.append({
-            "attempt": len(self._regens) + 1,
-            "command": command,
-            "clarification": clarification,
-        })
+        self._regens.append(
+            {
+                "attempt": len(self._regens) + 1,
+                "command": command,
+                "clarification": clarification,
+            }
+        )
 
     def reset_regen(self):
         self._regens.clear()

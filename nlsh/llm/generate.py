@@ -21,14 +21,10 @@ def _build_sections(clarification, store, terminal_history=""):
     )
     regen = store.format_regen_history()
     regen_section = (
-        f"\n\nPrevious attempts:\n{regen}"
-        if regen != "No previous attempts."
-        else ""
+        f"\n\nPrevious attempts:\n{regen}" if regen != "No previous attempts." else ""
     )
     th_sec = (
-        f"\n\nRecent terminal activity:\n{terminal_history}"
-        if terminal_history
-        else ""
+        f"\n\nRecent terminal activity:\n{terminal_history}" if terminal_history else ""
     )
     return clarification_section, regen_section, th_sec
 
@@ -53,7 +49,7 @@ def get_command(user_input, cwd, store, clarification="", terminal_history=""):
 
         if "\nCLARIFY:" in result or result.startswith("CLARIFY:"):
             idx = result.find("CLARIFY:")
-            clarify_text = result[idx + 8:].strip()
+            clarify_text = result[idx + 8 :].strip()
             return (None, parse_clarify_response(clarify_text))
         return (clean_cmd(result), None)
     except Exception as e:
