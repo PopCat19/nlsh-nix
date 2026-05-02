@@ -16,6 +16,12 @@ from .llm import init_client, reinit_client, get_command
 from .history import add_to_history, reset_regen_history, add_regen
 from .ui import get_single_key, show_help, show_config, raw_input
 
+SHELL = os.environ.get('SHELL', '/bin/sh')
+
+def run_cmd(cmd: str) -> subprocess.CompletedProcess:
+    """Run command through user's shell."""
+    return subprocess.run([SHELL, '-c', cmd], capture_output=True, text=True)
+
 def exit_handler(sig, frame):
     print()
     raise InterruptedError()
@@ -106,7 +112,7 @@ def run_oneshot(args: str):
         key = get_single_key()
         
         if key == '\r' or key == '\n':
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            result = run_cmd(command)
             print(result.stdout, end="")
             if result.stderr:
                 print(result.stderr, end="")
@@ -226,7 +232,7 @@ def run_repl():
                 cmd = user_input[1:]
                 if not cmd:
                     continue
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                result = run_cmd(cmd)
                 print(result.stdout, end="")
                 if result.stderr:
                     print(result.stderr, end="")
@@ -234,7 +240,7 @@ def run_repl():
                 continue
 
             if not is_natural_language(user_input):
-                result = subprocess.run(user_input, shell=True, capture_output=True, text=True)
+                result = run_cmd(user_input)
                 print(result.stdout, end="")
                 if result.stderr:
                     print(result.stderr, end="")
@@ -273,7 +279,7 @@ def run_repl():
                         except Exception as e:
                             print(f"cd: {e}")
                     else:
-                        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                        result = run_cmd(command)
                         print(result.stdout, end="")
                         if result.stderr:
                             print(result.stderr, end="")
