@@ -205,9 +205,6 @@ def show_config():
 
 load_config()
 
-def is_configured():
-    return all(os.environ.get(k) for k in REQUIRED_KEYS)
-
 first_run = not is_configured()
 if first_run:
     setup_api_key()
