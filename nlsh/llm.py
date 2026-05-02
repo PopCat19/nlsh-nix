@@ -142,7 +142,6 @@ Output only the scout commands, nothing else:"""
             print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
             continue
         elif key == '\r' or key == '\n':  # Run
-            print(f"  \033[36m[running] (0s/10s)\033[0m", end='\r')
             start = time.time()
             
             def show_time():
@@ -157,17 +156,16 @@ Output only the scout commands, nothing else:"""
             try:
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
                 elapsed = int(time.time() - start)
-                print(f"  {i}. $ {cmd}")
+                # Clear running indicator
+                print(" " * 40, end='\r')
+                status = "\033[32m✓\033[0m" if result.returncode == 0 else f"\033[31m✗ ({result.returncode})\033[0m"
+                print(f"  {i}. $ {cmd} {status}")
+                # Keep output for LLM but don't show
                 output = (result.stdout + result.stderr)
-                if output.strip():
-                    print(f"  \033[36m[output]\033[0m")
-                    # Show max 20 lines
-                    for line in output.strip().split('\n')[:20]:
-                        print(f"     {line}")
-                # Keep full output for LLM
                 scout_results.append(f"$ {cmd}\n{output[:500]}")
             except subprocess.TimeoutExpired:
-                print(f"  {i}. $ {cmd} \033[31m[timeout]\033[0m")
+                print(" " * 40, end='\r')
+                print(f"  {i}. $ {cmd} \033[31m✗ (timeout)\033[0m")
         else:
             print(f"  {i}. $ {cmd} \033[90m[skipped]\033[0m")
             continue
