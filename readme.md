@@ -96,10 +96,11 @@ The `(regen N)` counter shows regeneration attempts.
 
 ### Behavior
 
-- Type naturally → suggests a shell command
+- Type naturally → suggets a shell command
+- Commands run through `$SHELL` (aliases and functions work)
 - Shell commands (`ls`, `git`, `nix`, etc.) run directly without LLM
 - `cd` works natively for directory navigation
-- Shell-aware: uses your aliases (bash/zsh) and abbreviations (fish)
+- Shell context (aliases/fish abbr) included in prompts
 - Model sees previous regeneration attempts
 - 30s timeout with progress indicator
 
@@ -196,6 +197,7 @@ rm -rf ~/.config/nlsh
 - Modular codebase (config, history, llm, ui, main)
 - Config at `~/.config/nlsh/config` (XDG-friendly)
 - One-shot mode with command-line args
+- Commands run through `$SHELL` (aliases/functions work)
 - Shell context (aliases/fish abbr) included in prompts
 - Single-key confirmation (Enter/r/a/Esc)
 - Ask menu with numbered options (1-0)
@@ -203,3 +205,4 @@ rm -rf ~/.config/nlsh
 - Regen history visible to model for learning
 - Timeout indicator with progress
 - Interactive `!api` menu with cancel
+- Native ESC/backspace handling in inputs
