@@ -338,9 +338,11 @@ def main():
     if args:
         cwd = os.getcwd()
         command = get_command(args, cwd)
+        regen_count = 0
         
         while True:
-            print(f"\033[33m→ {command}\033[0m")
+            regen_str = f" (regen {regen_count})" if regen_count > 0 else ""
+            print(f"\033[33m→ {command}\033[0m{regen_str}")
             print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
             key = get_single_key()
             
@@ -352,6 +354,7 @@ def main():
                 sys.exit(0)
             elif key == 'r':
                 command = get_command(args, cwd)
+                regen_count += 1
             elif key == '\x1b':  # ESC
                 sys.exit(0)
             else:
@@ -426,8 +429,11 @@ def main():
                 print(f"\033[31merror: {e}\033[0m")
                 continue
 
+            regen_count = 0
             while True:
-                print(f"\033[33m→ {command}\033[0m \033[36m[Enter=run r=regen Esc=cancel]\033[0m")
+                regen_str = f" \033[36m(regen {regen_count})\033[0m" if regen_count > 0 else ""
+                print(f"\033[33m→ {command}\033[0m{regen_str}")
+                print("\033[36m[Enter=run r=regen Esc=cancel]\033[0m")
                 key = get_single_key()
                 
                 if key == '\r' or key == '\n':  # Enter
@@ -448,6 +454,7 @@ def main():
                 elif key == 'r':
                     try:
                         command = get_command(user_input, cwd)
+                        regen_count += 1
                     except TimeoutError:
                         print("\033[31mtimed out - press r to retry\033[0m")
                     except Exception as e:
