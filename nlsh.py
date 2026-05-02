@@ -103,7 +103,9 @@ first_run = not is_configured()
 if first_run:
     setup_api_key()
 
-print(f"\033[1mnlsh\033[0m - model: \033[36m{os.environ.get('NLSH_MODEL', 'unknown')}\033[0m\n")
+_version = "@VERSION@"
+_date = "@DATE@"[:8]  # YYYYMMDD
+print(f"\033[1mnlsh\033[0m {_version} ({_date}) - model: \033[36m{os.environ.get('NLSH_MODEL', 'unknown')}\033[0m\n")
 show_help()
 
 from openai import OpenAI

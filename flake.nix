@@ -24,26 +24,32 @@
             version = "0.1.0";
             pyproject = false;
 
-          src = ./.;
+            src = ./.;
 
-          propagatedBuildInputs = [ pypkgs.openai ];
+            propagatedBuildInputs = [ pypkgs.openai ];
 
-          installPhase = ''
-            runHook preInstall
-            mkdir -p $out/bin
-            cp nlsh.py $out/bin/nlsh
-            chmod +x $out/bin/nlsh
-            runHook postInstall
-          '';
+            postPatch = ''
+              substituteInPlace nlsh.py \
+                --replace-fail '@VERSION@' '${self.shortRev or "dirty"}' \
+                --replace-fail '@DATE@' '${self.lastModifiedDate}'
+            '';
 
-          meta = {
-            description = "Natural language shell (NixOS-compatible)";
-            homepage = "https://github.com/PopCat19/nlsh-nix";
-            license = pkgs.lib.licenses.mit;
-            mainProgram = "nlsh";
-            platforms = supportedSystems;
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/bin
+              cp nlsh.py $out/bin/nlsh
+              chmod +x $out/bin/nlsh
+              runHook postInstall
+            '';
+
+            meta = {
+              description = "Natural language shell (NixOS-compatible)";
+              homepage = "https://github.com/PopCat19/nlsh-nix";
+              license = pkgs.lib.licenses.mit;
+              mainProgram = "nlsh";
+              platforms = supportedSystems;
+            };
           };
-        };
       });
 
       devShells = forAllSystems (system:
