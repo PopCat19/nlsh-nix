@@ -118,7 +118,9 @@ Output only the single scout command:"""
             cmd = cmd.split('\n', 1)[1] if '\n' in cmd else ''
         if cmd.endswith('```'):
             cmd = cmd.rsplit('```', 1)[0]
-        return cmd.strip() if cmd else None
+        # Remove backticks
+        cmd = cmd.strip('`').strip()
+        return cmd if cmd else None
     except:
         return None
 
@@ -195,12 +197,31 @@ Output only the scout commands, nothing else:"""
             try:
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
                 elapsed = int(time.time() - start)
-                status = "\033[32m✓\033[0m" if result.returncode == 0 else f"\033[31m✗ ({result.returncode})\033[0m"
+                status = "\033[32m✓\033[0m" if result.returncode == 0 else "\033[31m✗\033[0m"
                 print(f"  {status} \033[90m{elapsed}s\033[0m")
+                if result.returncode != 0:
+                    print(f"  \033[36m[r=regen s=skip]\033[0m", end='', flush=True)
+                    retry = get_single_key()
+                    print()
+                    if retry == 'r' or retry == 'R':
+                        print(f"  \033[90m[regenerating...]\033[0m")
+                        new_cmd = get_scout_cmd(user_input, cwd, cmd)
+                        if new_cmd:
+                            scout_cmds.insert(i, new_cmd)
+                        continue
                 output = (result.stdout + result.stderr)
                 scout_results.append(f"$ {cmd}\n{output[:500]}")
             except subprocess.TimeoutExpired:
                 print(f"  \033[31m✗ (timeout)\033[0m")
+                print(f"  \033[36m[r=regen s=skip]\033[0m", end='', flush=True)
+                retry = get_single_key()
+                print()
+                if retry == 'r' or retry == 'R':
+                    print(f"  \033[90m[regenerating...]\033[0m")
+                    new_cmd = get_scout_cmd(user_input, cwd, cmd)
+                    if new_cmd:
+                        scout_cmds.insert(i, new_cmd)
+                    continue
         else:
             print(f"  \033[90m[skipped]\033[0m")
             continue
