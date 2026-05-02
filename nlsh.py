@@ -158,7 +158,7 @@ class AwaitIndicator:
     def _tick(self):
         while not self.stop_event.is_set():
             elapsed = int(time.time() - self.start_time)
-            sys.stdout.write(f"\r\033[33m[awaiting response] ({elapsed}/{self.timeout})\033[0m")
+            sys.stdout.write(f"\r\033[33m[awaiting API response...] ({elapsed}s/{self.timeout}s)\033[0m")
             sys.stdout.flush()
             time.sleep(0.1)
             if elapsed >= self.timeout:
