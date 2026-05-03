@@ -2,7 +2,7 @@
 
 NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmoud/nlsh) with OpenAI-compatible API support.
 
-<details>
+<details open>
 <summary>Installation</summary>
 
 ```bash
