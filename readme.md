@@ -127,12 +127,12 @@ Each scout runs with approval — shows output inline (first 5 lines).
 
 Press `a` to refine requests:
 
+- `0` Custom description
 - `1` Clarify the request
 - `2` A different command
 - `3` Modify this command
 - `4` Safer/alternative approach
 - `5` Something completely different
-- `0` Custom description
 
 #### History sharing
 
@@ -170,6 +170,16 @@ Press `h` to share shell history (tail 50 lines, fish/bass/zsh auto-detected). P
 - `Enter` — execute
 - `c` — copy to clipboard
 - `Esc` — cancel
+
+**Ask menu**
+
+- `0` — custom description
+- `1` — clarify request
+- `2` — different command
+- `3` — modify command
+- `4` — safer alternative
+- `5` — something different
+- `Esc` — back
 
 **`!api` menu**
 

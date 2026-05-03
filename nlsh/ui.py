@@ -227,12 +227,12 @@ def show_gen_options(commands):
 
 def show_ask_options():
     print("\033[36mWhat do you want?\033[0m")
+    print("  \033[33m0\033[0m) Custom description")
     print("  \033[33m1\033[0m) Clarify the request")
     print("  \033[33m2\033[0m) A different command")
     print("  \033[33m3\033[0m) Modify this command")
     print("  \033[33m4\033[0m) Safer/alternative approach")
     print("  \033[33m5\033[0m) Something completely different")
-    print("  \033[33m0\033[0m) Custom description")
     print("  \033[33mEsc\033[0m) Cancel")
     print()
 
@@ -246,7 +246,7 @@ def prompt_clarify(clarify):
         print(f"  \033[33m{key}\033[0m) {clarify.options[key]}")
     print()
 
-    answer = raw_input("\033[33mSelect 1-0, or type answer: \033[0m")
+    answer = raw_input("\033[33mSelect 0-9, or type answer: \033[0m")
     if not answer:
         return ""
 
