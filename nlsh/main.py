@@ -462,7 +462,11 @@ def run_repl(store, config):
                 cmd, clarify = get_command(user_input, cwd, store)
                 if clarify:
                     clarification = prompt_clarify(clarify)
-                    cmd, _ = get_command(user_input, cwd, store, clarification)
+                    if not clarification:
+                        continue
+                    cmd, _ = get_command(
+                        user_input, cwd, store, clarification,
+                    )
 
                 if not cmd:
                     print("\033[31mNo command generated\033[0m")

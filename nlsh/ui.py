@@ -244,6 +244,7 @@ def prompt_clarify(clarify):
     print(f"\033[36m{clarify.question}\033[0m")
     for key in sorted(clarify.options.keys()):
         print(f"  \033[33m{key}\033[0m) {clarify.options[key]}")
+    print("  \033[33mEsc\033[0m) Cancel")
     print()
 
     answer = raw_input("\033[33mSelect 0-9, or type answer: \033[0m")
