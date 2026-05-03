@@ -3,150 +3,31 @@
 NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmoud/nlsh) with OpenAI-compatible API support.
 
 <details open>
-<summary>Usage</summary>
-
-#### One-shot
+<summary>Installation</summary>
 
 ```bash
-nlsh list all python files
+# Run directly
+nix run github:PopCat19/nlsh-nix
+
+# Temporary shell
+nix shell github:PopCat19/nlsh-nix && nlsh
+
+# Install to profile
+nix profile add github:PopCat19/nlsh-nix
+
+# Update
+nix profile upgrade nlsh-nix --refresh
+
+# Remove
+nix profile remove nlsh-nix
+rm -rf ~/.config/nlsh
 ```
 
+#### Flake input
+
+```nix
+inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
 ```
-nlsh fc5434b (20260502) - model: ministral-3:8b
-
-Generated commands:
-  1) Find Python files recursively
-  ↳ find . -name "*.py"
-  2) Use fd for faster search
-  ↳ fd -e py
-
-[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
-```
-
-#### REPL
-
-```bash
-nlsh
-```
-
-```
-popcat19 > nixos rebuild
-
-Generated commands:
-  1) Switch to new configuration
-  ↳ sudo nixos-rebuild switch
-
-[Enter=1 2-3=select s=scout r=regen a=ask Esc=cancel]
-```
-
-</details>
-
-<details>
-<summary>Keybindings</summary>
-
-| Context | Key | Action |
-|---|---|---|
-| Command selection | `Enter` | Run option 1 |
-| | `1`–`9` | Select option |
-| | `s` | Scout mode |
-| | `r` | Regenerate |
-| | `a` | Ask menu |
-| | `Esc` | Cancel |
-| Scout approval | `Enter` | Run scout cmd |
-| | `s` | Skip |
-| | `r` | Alternative scout |
-| | `Esc` | Cancel scout |
-| Confirmation | `Enter` | Execute |
-| | `c` | Copy to clipboard |
-| | `Esc` | Cancel |
-| Ask menu | `1`–`5`,`0` | Select request |
-| | `Esc` | Back |
-| `!api` menu | `1`–`3` | Edit field |
-| | `s` | Save & exit |
-| | `c` / `Esc` | Cancel |
-| REPL input | `⭠⭢` | Move cursor |
-| | `Home` / `End` | Jump ends |
-| | `Delete` | Delete at cursor |
-| | `Ctrl+W` | Delete word |
-| | `Ctrl+U` | Clear line |
-| | `Esc` | Empty input |
-| REPL commands | `!api` | Config menu |
-| | `!config` | Show config |
-| | `!help` | Help screen |
-| | `!cmd <cmd>` | Run shell cmd |
-| | `!quit` / `!q` | Exit |
-| | `↑` / `↓` | History recall |
-
-</details>
-
-<details>
-<summary>Scout mode</summary>
-
-Press `s` from the command selection to let the model explore your environment first:
-
-```
-s
-Scouting...
-  1. $ which nixos-rebuild
-  [Enter=run s=skip r=regen Esc=cancel]
-  ✓ 0s
-  
-  2. $ ls -la /etc/nixos
-  ✓ 0s
-```
-
-Per scout command: `Enter` run, `s` skip, `r` alternative, `Esc` cancel.
-
-On failure, the prompt shows `[r=regen s=skip]`. Commands are blocked if dangerous (`find /`, `rm`, `sudo`, etc.).
-
-</details>
-
-<details>
-<summary>Ask menu</summary>
-
-Press `a` from the command selection:
-
-```
-What do you want?
-  1) Clarify the request
-  2) A different command
-  3) Modify this command
-  4) Safer/alternative approach
-  5) Something completely different
-  0) Custom description
-  Esc) Cancel
-```
-
-The model may also initiate clarification (shows choices you can select or type a freeform answer).
-
-</details>
-
-<details>
-<summary>Confirmation</summary>
-
-```
-→ sudo nixos-rebuild switch
-[Enter=run c=copy Esc=cancel]
-```
-
-- **Sudo commands** show `⚠ sudo:` in red
-- **c** copies to clipboard (wl-copy / xclip / xsel)
-- Commands run through `$SHELL` so aliases and functions work
-- Elapsed time shown inline: `[running] (3s)`
-- 30s timeout with progress indicator
-
-</details>
-
-<details>
-<summary>First run</summary>
-
-Prompts for:
-
-1. **Base URL** — e.g. `https://api.openai.com/v1`
-2. **Model** — e.g. `gpt-4o`
-3. **API key** — masked input (`*` echoed), skip for local services
-
-Press `Esc` at any prompt to cancel (exits if setup incomplete).
 
 </details>
 
@@ -161,10 +42,13 @@ Config file: `~/.config/nlsh/config`
 | `NLSH_MODEL` | yes | Model name |
 | `NLSH_API_KEY` | no | API key (skip for local) |
 
-Env vars take precedence over the config file. Use `!api` from REPL for interactive editing.
+Env vars take precedence. Use `!api` from REPL for interactive editing.
 
-<details>
-<summary>Provider examples</summary>
+#### First run
+
+Prompts for Base URL, Model, and API key (masked `*` echo). Press `Esc` to cancel.
+
+#### Provider examples
 
 **OpenAI**
 
@@ -189,27 +73,125 @@ export NLSH_MODEL=my-model
 ```
 
 </details>
+
+<details open>
+<summary>Usage</summary>
+
+#### One-shot
+
+```bash
+nlsh list all python files
+```
+
+```
+nlsh ad56306 (20260502) - model: ministral-3:8b
+
+Generated commands:
+  1) Find Python files recursively
+  ↳ find . -name "*.py"
+  2) Use fd for faster search
+  ↳ fd -e py
+
+[Enter=1 2-3=select s=scout r=regen a=ask h=hist Esc=cancel]
+```
+
+#### REPL
+
+```bash
+nlsh
+```
+
+```
+popcat19 > nixos rebuild
+
+Generated commands:
+  1) Switch to new configuration
+  ↳ sudo nixos-rebuild switch
+
+[Enter=1 2-3=select s=scout r=regen a=ask h=hist Esc=cancel]
+```
+
+#### Scout mode
+
+Press `s` to let the model explore before proposing. Uses OpenAI tool calling (`bash`, `read` tools). Shows proposed scouts for review with toggle-to-skip.
+
+```
+Proposed scout commands:
+  1. ⚙ bash $ which nixos-rebuild           [run]
+  2. 📄 read /etc/nixos/flake.nix           [run]
+
+[Enter=run-selected r=regen 1-2=toggle Esc=cancel]
+```
+
+Each scout runs with approval — shows output inline (first 5 lines).
+
+#### Ask menu
+
+Press `a` to refine: clarify, different command, modify, safer approach, or custom.
+
+#### History sharing
+
+Press `h` to share shell history (tail 50 lines, fish/bass/zsh auto-detected). Preview → edit in `$EDITOR`, copy to clipboard, or paste from clipboard before sending.
+
+#### REPL commands
+
+| Command | Action |
+|---|---|
+| `!api` | Interactive config menu |
+| `!config` | Show current config |
+| `!help` | Help screen |
+| `!cmd <cmd>` | Run shell command directly |
+| `!quit` / `!q` | Exit |
+
+#### Keybindings
+
+| Context | Key | Action |
+|---|---|---|
+| Command selection | `Enter` / `1` | Run option 1 |
+| | `2`–`9` | Select option |
+| | `s` | Scout mode |
+| | `r` | Regenerate |
+| | `a` | Ask menu |
+| | `h` | Share shell history |
+| | `Esc` | Cancel |
+| Scout approval | `Enter` | Run scout cmd |
+| | `s` | Skip |
+| | `r` | Alternative scout |
+| | `Esc` | Cancel scout |
+| Confirmation | `Enter` | Execute |
+| | `c` | Copy to clipboard |
+| | `Esc` | Cancel |
+| Ask menu | `1`–`5`,`0` | Select request |
+| | `Esc` | Back |
+| `!api` menu | `1`–`3` | Edit field |
+| | `s` | Save & exit |
+| | `c` / `Esc` | Cancel |
+| REPL input | `⭠⭢` | Move cursor |
+| | `Home` / `End` | Jump ends |
+| | `Delete` | Delete at cursor |
+| | `Ctrl+W` | Delete word |
+| | `Ctrl+U` | Clear line |
+| | `Esc` | Empty input |
+| | `↑` / `↓` | History recall |
+
 </details>
 
 <details>
-<summary>Nix</summary>
+<summary>Features</summary>
 
-```bash
-# Run directly
-nix run github:PopCat19/nlsh-nix
-
-# Temporary shell
-nix shell github:PopCat19/nlsh-nix && nlsh
-
-# Install
-nix profile add github:PopCat19/nlsh-nix
-
-# Update
-nix profile upgrade nlsh-nix --refresh
-
-# Flake input
-# inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
-```
+- Commands run through `$SHELL` (aliases and functions work)
+- Sudo detection with `⚠ sudo:` warning
+- Running indicator with elapsed time: `[running] (3s)`
+- 30s timeout with progress indicator
+- Confirmation before execution with clipboard copy (`c`)
+- Multiple command proposals (up to 3) with descriptions
+- Model-initiated clarification with choices
+- Regen history visible to model for learning
+- Shell context (aliases, fish abbreviations) included in prompts
+- Native ESC/backspace/arrow/home/end/delete/Ctrl+W/Ctrl+U handling
+- History recall (`↑`/`↓`) in REPL
+- Masked API key input (`*` echo)
+- Config at `~/.config/nlsh/config` (XDG-friendly)
 
 </details>
 
@@ -218,21 +200,27 @@ nix profile upgrade nlsh-nix --refresh
 
 - OpenAI-compatible API (OpenAI, Ollama, vLLM, LM Studio, etc.)
 - One-shot mode with command-line args
-- Multiple command proposals (up to 3) with descriptions
-- Scout mode — model explores environment before proposing
+- Multiple command proposals with descriptions
+- Scout mode via OpenAI tool calling (bash + read tools)
+- Preview + toggle for scout commands before execution
 - Confirmation with clipboard copy
 - Sudo detection with warning
 - Running indicator with elapsed time
-- Ask menu with numbered options (1–0) and freeform
+- Ask menu with numbered options and freeform
 - Model-initiated clarification with choices
-- Regen history visible to model for learning
+- Shell history sharing with edit/approve consent loop
+- Regen history visible to model
 - 30s timeout with progress indicator
-- Interactive `!api` menu with masked API key input
-- ESC/backspace/arrow/home/end/delete/Ctrl+W/Ctrl+U in REPL input
-- History recall (↑/↓) in REPL
-- Config at `~/.config/nlsh/config` (XDG-friendly)
-- Commands run through `$SHELL` (aliases/functions work)
-- Shell context (fish abbr) included in prompts
+- Interactive `!api` menu with masked API key
+- Full readline-style line editing in REPL input
 - Version format: yyyymmdd-&lt;rev&gt;
+- Modular codebase (config, history, llm subpackage, ui, types, util)
+
+</details>
+
+<details>
+<summary>Credits</summary>
+
+Forked from [nlsh](https://github.com/junaid-mahmoud/nlsh) by [Junaid Mahmoud](https://github.com/junaid-mahmoud).
 
 </details>
