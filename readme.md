@@ -2,7 +2,7 @@
 
 NixOS-compatible packaging for [nlsh](https://github.com/junaid-mahmoud/nlsh) with OpenAI-compatible API support.
 
-<details open>
+<details>
 <summary>Installation</summary>
 
 ```bash
@@ -36,17 +36,15 @@ inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
 
 Config file: `~/.config/nlsh/config`
 
-| Variable | Required | Description |
-|---|---|---|
-| `NLSH_BASE_URL` | yes | API endpoint |
-| `NLSH_MODEL` | yes | Model name |
-| `NLSH_API_KEY` | no | API key (skip for local) |
+- `NLSH_BASE_URL` **(required)** — API endpoint (e.g. `https://api.openai.com/v1`)
+- `NLSH_MODEL` **(required)** — model name (e.g. `gpt-4o`)
+- `NLSH_API_KEY` — API key, skip for local services
 
-Env vars take precedence. Use `!api` from REPL for interactive editing.
+Env vars take precedence over the config file. Use `!api` from REPL for interactive editing.
 
 #### First run
 
-Prompts for Base URL, Model, and API key (masked `*` echo). Press `Esc` to cancel.
+Prompts for Base URL, Model, and API key (masked `*` echo). Press `Esc` at any prompt to cancel.
 
 #### Provider examples
 
@@ -74,7 +72,7 @@ export NLSH_MODEL=my-model
 
 </details>
 
-<details open>
+<details>
 <summary>Usage</summary>
 
 #### One-shot
@@ -113,7 +111,7 @@ Generated commands:
 
 #### Scout mode
 
-Press `s` to let the model explore before proposing. Uses OpenAI tool calling (`bash`, `read` tools). Shows proposed scouts for review with toggle-to-skip.
+Press `s` to let the model explore before proposing. Uses OpenAI tool calling (`bash`, `read` tools). Shows proposed scouts for review with toggle-to-skip:
 
 ```
 Proposed scout commands:
@@ -127,7 +125,14 @@ Each scout runs with approval — shows output inline (first 5 lines).
 
 #### Ask menu
 
-Press `a` to refine: clarify, different command, modify, safer approach, or custom.
+Press `a` to refine requests:
+
+- `1` Clarify the request
+- `2` A different command
+- `3` Modify this command
+- `4` Safer/alternative approach
+- `5` Something completely different
+- `0` Custom description
 
 #### History sharing
 
@@ -135,51 +140,59 @@ Press `h` to share shell history (tail 50 lines, fish/bass/zsh auto-detected). P
 
 #### REPL commands
 
-| Command | Action |
-|---|---|
-| `!api` | Interactive config menu |
-| `!config` | Show current config |
-| `!help` | Help screen |
-| `!cmd <cmd>` | Run shell command directly |
-| `!quit` / `!q` | Exit |
+- `!api` — interactive config menu (masked API key input)
+- `!config` — show current config
+- `!help` — help screen
+- `!cmd <cmd>` — run shell command directly
+- `!quit` / `!q` — exit
 
 #### Keybindings
 
-| Context | Key | Action |
-|---|---|---|
-| Command selection | `Enter` / `1` | Run option 1 |
-| | `2`–`9` | Select option |
-| | `s` | Scout mode |
-| | `r` | Regenerate |
-| | `a` | Ask menu |
-| | `h` | Share shell history |
-| | `Esc` | Cancel |
-| Scout approval | `Enter` | Run scout cmd |
-| | `s` | Skip |
-| | `r` | Alternative scout |
-| | `Esc` | Cancel scout |
-| Confirmation | `Enter` | Execute |
-| | `c` | Copy to clipboard |
-| | `Esc` | Cancel |
-| Ask menu | `1`–`5`,`0` | Select request |
-| | `Esc` | Back |
-| `!api` menu | `1`–`3` | Edit field |
-| | `s` | Save & exit |
-| | `c` / `Esc` | Cancel |
-| REPL input | `⭠⭢` | Move cursor |
-| | `Home` / `End` | Jump ends |
-| | `Delete` | Delete at cursor |
-| | `Ctrl+W` | Delete word |
-| | `Ctrl+U` | Clear line |
-| | `Esc` | Empty input |
-| | `↑` / `↓` | History recall |
+**Command selection**
+
+- `Enter` / `1` — run option 1
+- `2`–`9` — select option
+- `s` — scout mode
+- `r` — regenerate
+- `a` — ask menu
+- `h` — share shell history
+- `Esc` — cancel
+
+**Scout approval**
+
+- `Enter` — run scout command
+- `s` — skip
+- `r` — alternative scout
+- `Esc` — cancel scout
+
+**Confirmation**
+
+- `Enter` — execute
+- `c` — copy to clipboard
+- `Esc` — cancel
+
+**`!api` menu**
+
+- `1`–`3` — edit field
+- `s` — save & exit
+- `c` / `Esc` — cancel (reverts changes)
+
+**REPL input**
+
+- `⭠⭢` — move cursor
+- `Home` / `End` — jump to ends
+- `Delete` — delete at cursor
+- `Ctrl+W` — delete word backward
+- `Ctrl+U` — clear line
+- `Esc` — empty input
+- `↑` / `↓` — history recall
 
 </details>
 
 <details>
 <summary>Features</summary>
 
-- Commands run through `$SHELL` (aliases and functions work)
+- Commands run through `$SHELL` — aliases and functions work
 - Sudo detection with `⚠ sudo:` warning
 - Running indicator with elapsed time: `[running] (3s)`
 - 30s timeout with progress indicator
