@@ -515,6 +515,8 @@ def main():
     )
 
     init_client(config)
+    from .llm.shell import ensure_shell_context
+    ensure_shell_context()
     store = HistoryStore()
 
     args = " ".join(sys.argv[1:])
