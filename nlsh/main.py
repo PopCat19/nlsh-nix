@@ -392,7 +392,10 @@ def run_oneshot(args, store, config):
         sys.exit(1)
 
     store.add_regen(commands[0].cmd)
-    _command_selection(args, cwd, commands, store, config)
+    try:
+        _command_selection(args, cwd, commands, store, config)
+    except (KeyboardInterrupt, InterruptedError):
+        print("\n\033[31mInterrupted\033[0m")
     sys.exit(0)
 
 

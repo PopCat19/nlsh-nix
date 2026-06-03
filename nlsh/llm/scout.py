@@ -20,6 +20,11 @@ from .prompts import PROMPT_SCOUT_SINGLE, _is_blocked_scout
 from .shell import ensure_shell_context
 from .tools import SCOUT_TOOLS, _execute_tool
 
+try:
+    InterruptedError
+except NameError:
+    InterruptedError = KeyboardInterrupt  # Python < 3.5 compat
+
 
 def _show_scout_preview(scout_cmds, skipped):
     print("\033[36mProposed scout commands:\033[0m")
@@ -63,7 +68,10 @@ def get_scout_cmd(user_input, cwd, rejected=""):
 
 
 def _fallback_from_executed(executed, user_input, cwd, store):
-    """Generate commands from executed scout output when tool-call flow fails."""
+    """Generate commands from executed scout output when tool-call flow fails.
+
+    Always returns List[Command] — never a raw string.
+    """
     shell_ctx = ensure_shell_context()
     output_text = "\n\n".join(o for _, o in executed)
 
@@ -77,7 +85,16 @@ def _fallback_from_executed(executed, user_input, cwd, store):
     )
 
     try:
-        return _call_api([{"role": "user", "content": gen_prompt}])
+        result = _call_api([{"role": "user", "content": gen_prompt}])
+        commands = parse_multi_commands(result)
+        if commands:
+            return commands[:3]
+        single, _ = get_command(user_input, cwd, store, "")
+        if single:
+            return [Command(cmd=single)]
+        return [Command(cmd="echo 'no command generated'")]
+    except (KeyboardInterrupt, InterruptedError):
+        return [Command(cmd="echo 'scout interrupted'")]
     except Exception:
         return get_commands(user_input, cwd, store, "")
 
@@ -98,6 +115,9 @@ def scout_and_get_commands(user_input, cwd, store):
     # Step 1: Get model to propose tool calls
     try:
         msg = _call_api_tools(messages, SCOUT_TOOLS)
+    except (KeyboardInterrupt, InterruptedError):
+        print("\n\033[31mInterrupted\033[0m")
+        return [Command(cmd="echo 'scout interrupted'")]
     except Exception:
         return _fallback_from_executed([], user_input, cwd, store)
 
@@ -281,6 +301,9 @@ def scout_and_get_commands(user_input, cwd, store):
             )
             try:
                 msg2 = _call_api_tools(messages, SCOUT_TOOLS, max_tokens=512)
+            except (KeyboardInterrupt, InterruptedError):
+                print("\n\033[31mInterrupted\033[0m")
+                return _fallback_from_executed(executed, user_input, cwd, store)
             except Exception:
                 return _fallback_from_executed(executed, user_input, cwd, store)
 
