@@ -252,7 +252,7 @@ def scout_and_get_commands(user_input, cwd, store):
     if not executed:
         return [Command(cmd="echo 'no scouts executed'")]
 
-    # Step 3: Feed results back and generate final commands
+    # Step 3: Feed results back and let model decide — more scouting or final commands
     if tool_calls:
         messages.append(msg)
         for tc_id, output in executed:
@@ -263,24 +263,104 @@ def scout_and_get_commands(user_input, cwd, store):
                     "content": output,
                 }
             )
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    f"Now generate exactly 3 different shell commands for: "
-                    f"{user_input}\n"
-                    f"Format: 1) <command> // <brief description>"
-                ),
-            }
-        )
-        try:
-            result = _call_api(messages, max_tokens=256)
-        except Exception:
-            return _fallback_from_executed(executed, user_input, cwd, store)
-    else:
-        result = _fallback_from_executed(executed, user_input, cwd, store)
-        if isinstance(result, list):
-            return result
+
+        max_scout_rounds = 3
+        for _ in range(max_scout_rounds):
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        f"Do you have enough information to generate commands "
+                        f"for: {user_input}?\n\n"
+                        f"If YES — generate exactly 3 different shell commands:\n"
+                        f"Format: 1) <command> // <brief description>\n\n"
+                        f"If NO — use the bash or read tools to gather more "
+                        f"information (readonly only)."
+                    ),
+                }
+            )
+            try:
+                msg2 = _call_api_tools(messages, SCOUT_TOOLS, max_tokens=512)
+            except Exception:
+                return _fallback_from_executed(executed, user_input, cwd, store)
+
+            more_calls = msg2.tool_calls or []
+
+            if not more_calls:
+                # Model has enough info — parse text response
+                if msg2 and msg2.content:
+                    commands = parse_multi_commands(msg2.content)
+                    if len(commands) >= 3:
+                        return commands[:3]
+                return _fallback_from_executed(executed, user_input, cwd, store)
+
+            # Model wants more scouting — collect proposed commands
+            new_scout_cmds = []
+            for tc in more_calls:
+                fn = tc.function
+                if fn.name == "bash":
+                    try:
+                        args = json.loads(fn.arguments)
+                        cmd = args.get("command", "").strip()
+                    except Exception:
+                        continue
+                    if cmd and not _is_blocked_scout(cmd) and "sudo" not in cmd:
+                        new_scout_cmds.append(("bash", fn.name, cmd, tc.id))
+                elif fn.name == "read":
+                    try:
+                        args = json.loads(fn.arguments)
+                        path = args.get("path", "").strip()
+                    except Exception:
+                        continue
+                    if path:
+                        new_scout_cmds.append(("read", fn.name, path, tc.id))
+
+            if not new_scout_cmds:
+                return _fallback_from_executed(executed, user_input, cwd, store)
+
+            # Preview and execute with user approval
+            print(f"\n\033[36mAdditional scouting:\033[0m")
+            skipped = set()
+            while True:
+                key = _show_scout_preview(new_scout_cmds, skipped)
+                if key in ("\r", "\n"):
+                    break
+                elif key == "r":
+                    messages.pop()  # remove the last user message, re-ask model
+                    break
+                elif key == "\x1b":
+                    return _fallback_from_executed(executed, user_input, cwd, store)
+                elif key.isdigit():
+                    idx = int(key)
+                    if 1 <= idx <= len(new_scout_cmds):
+                        if idx in skipped:
+                            skipped.discard(idx)
+                        else:
+                            skipped.add(idx)
+
+            if key == "r":
+                continue  # re-ask model for better scouts
+
+            # Execute approved scouts
+            messages.append(msg2)
+            for i, (tool_type, _, value, tc_id) in enumerate(new_scout_cmds, 1):
+                if i in skipped:
+                    continue
+                args = {"command": value} if tool_type == "bash" else {"path": value}
+                output = _execute_tool(tool_type, args, cwd)
+                label = "⚙ bash" if tool_type == "bash" else "📄 read"
+                display = f"$ {value}" if tool_type == "bash" else value
+                line_count = output.count("\n") + 1 if output else 0
+                status = "\033[32m✓\033[0m" if not output.startswith(("(", "[blocked]")) else "\033[31m✗\033[0m"
+                print(f"  {i}. {label} {display} {status} \033[90m({line_count} lines)\033[0m")
+                messages.append({"role": "tool", "tool_call_id": tc_id, "content": output})
+                executed.append((tc_id, output))
+            # Loop back to ask model: enough info or scout more?
+
+    # If no tool_calls from Step 1, or we exhausted scout rounds
+    result = _fallback_from_executed(executed, user_input, cwd, store)
+    if isinstance(result, list):
+        return result
 
     commands = parse_multi_commands(result)
     if len(commands) >= 3:
