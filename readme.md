@@ -36,9 +36,9 @@ inputs.nlsh-nix.url = "github:PopCat19/nlsh-nix";
 
 Config file: `~/.config/nlsh/config`
 
-- `NLSH_BASE_URL` **(required)** — API endpoint (e.g. `https://api.openai.com/v1`)
-- `NLSH_MODEL` **(required)** — model name (e.g. `gpt-4o`)
-- `NLSH_API_KEY` — API key, skip for local services
+- `NLSH_BASE_URL` **(required)**, API endpoint (e.g. `https://api.openai.com/v1`)
+- `NLSH_MODEL` **(required)**, model name (e.g. `gpt-4o`)
+- `NLSH_API_KEY`, API key, skip for local services
 
 Env vars take precedence over the config file. Use `!api` from REPL for interactive editing.
 
@@ -121,7 +121,7 @@ Proposed scout commands:
 [Enter=run-selected r=regen 1-2=toggle Esc=cancel]
 ```
 
-Each scout runs with approval — shows output inline (first 5 lines).
+Each scout runs with approval, shows output inline (first 5 lines).
 
 #### Ask menu
 
@@ -140,69 +140,69 @@ Press `h` to share shell history (tail 50 lines, fish/bass/zsh auto-detected). P
 
 #### REPL commands
 
-- `!api` — interactive config menu (masked API key input)
-- `!config` — show current config
-- `!help` — help screen
-- `!cmd <cmd>` — run shell command directly
-- `!quit` / `!q` — exit
+- `!api`, interactive config menu (masked API key input)
+- `!config`, show current config
+- `!help`, help screen
+- `!cmd <cmd>`, run shell command directly
+- `!quit` / `!q`, exit
 
 #### Keybindings
 
 **Command selection**
 
-- `Enter` / `1` — run option 1
-- `2`–`9` — select option
-- `s` — scout mode
-- `r` — regenerate
-- `a` — ask menu
-- `h` — share shell history
-- `Esc` — cancel
+- `Enter` / `1`, run option 1
+- `2`–`9`, select option
+- `s`, scout mode
+- `r`, regenerate
+- `a`, ask menu
+- `h`, share shell history
+- `Esc`, cancel
 
 **Scout approval**
 
-- `Enter` — run scout command
-- `s` — skip
-- `r` — alternative scout
-- `Esc` — cancel scout
+- `Enter`, run scout command
+- `s`, skip
+- `r`, alternative scout
+- `Esc`, cancel scout
 
 **Confirmation**
 
-- `Enter` — execute
-- `c` — copy to clipboard
-- `Esc` — cancel
+- `Enter`, execute
+- `c`, copy to clipboard
+- `Esc`, cancel
 
 **Ask menu**
 
-- `0` — custom description
-- `1` — clarify request
-- `2` — different command
-- `3` — modify command
-- `4` — safer alternative
-- `5` — something different
-- `Esc` — back
+- `0`, custom description
+- `1`, clarify request
+- `2`, different command
+- `3`, modify command
+- `4`, safer alternative
+- `5`, something different
+- `Esc`, back
 
 **`!api` menu**
 
-- `1`–`3` — edit field
-- `s` — save & exit
-- `c` / `Esc` — cancel (reverts changes)
+- `1`–`3`, edit field
+- `s`, save & exit
+- `c` / `Esc`, cancel (reverts changes)
 
 **REPL input**
 
-- `⭠⭢` — move cursor
-- `Home` / `End` — jump to ends
-- `Delete` — delete at cursor
-- `Ctrl+W` — delete word backward
-- `Ctrl+U` — clear line
-- `Esc` — empty input
-- `↑` / `↓` — history recall
+- `⭠⭢`, move cursor
+- `Home` / `End`, jump to ends
+- `Delete`, delete at cursor
+- `Ctrl+W`, delete word backward
+- `Ctrl+U`, clear line
+- `Esc`, empty input
+- `↑` / `↓`, history recall
 
 </details>
 
 <details>
 <summary>Features</summary>
 
-- Commands run through `$SHELL` — aliases and functions work
+- Commands run through `$SHELL`, aliases and functions work
 - Sudo detection with `⚠ sudo:` warning
 - Running indicator with elapsed time: `[running] (3s)`
 - 30s timeout with progress indicator
